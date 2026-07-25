@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1720" />
+  <title>An Đồ — Chọn ngôn ngữ và Bản đồ SOS</title>
+  <link rel="preconnect" href="https://unpkg.com" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <style>
+    :root {
+      --ink:#0c1b22; --muted:#63737b; --paper:#fff; --surface:#f4f7f6;
+      --line:rgba(13,38,45,.10); --brand:#087f65; --brand2:#0ba57f;
+      --danger:#e93b45; --danger2:#ff685e; --warning:#e79b18; --blue:#2477d4;
+      --shadow:0 18px 56px rgba(4,23,31,.18); --shadow-soft:0 8px 28px rgba(4,23,31,.12);
+      --radius:24px; --safe-top:env(safe-area-inset-top,0px); --safe-bottom:env(safe-area-inset-bottom,0px);
+      --sheet-h:156px;
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    }
+    *{box-sizing:border-box} html,body{height:100%;margin:0;overflow:hidden;background:#dfe9e6;color:var(--ink)}
+    button,input,textarea,select{font:inherit} button{border:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+    .app{height:100%;position:relative;overflow:hidden;background:#dbe7e3}
+    #map{position:absolute;inset:0;background:linear-gradient(145deg,#dfeae5,#c7dbd4)}
+    .leaflet-control-attribution{font-size:9px!important;margin-bottom:calc(var(--sheet-h) + 4px)!important;opacity:.72}
+    .leaflet-control-zoom{display:none}
+
+    .map-dim{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(5,21,29,.12) 0,transparent 21%,transparent 73%,rgba(4,20,28,.20) 100%);z-index:400}
+    .topbar{position:absolute;z-index:900;top:calc(10px + var(--safe-top));left:12px;right:12px;display:flex;gap:9px;align-items:center}
+    .glass{background:rgba(255,255,255,.92);backdrop-filter:blur(22px) saturate(1.25);-webkit-backdrop-filter:blur(22px) saturate(1.25);box-shadow:var(--shadow-soft);border:1px solid rgba(255,255,255,.72)}
+    .round-btn{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;color:var(--ink);flex:none}
+    .round-btn svg,.map-tool svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .search{height:48px;border-radius:16px;flex:1;display:flex;align-items:center;gap:10px;padding:0 14px;min-width:0}
+    .search svg{width:20px;height:20px;stroke:#567078;fill:none;stroke-width:2}
+    .search span{font-size:15px;font-weight:650;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:#3d535b}
+    .status-dot{width:8px;height:8px;border-radius:50%;background:#19a97b;box-shadow:0 0 0 4px rgba(25,169,123,.13)}
+
+    .net-status{position:absolute;z-index:850;top:calc(68px + var(--safe-top));left:14px;display:flex;gap:7px;align-items:center;padding:7px 10px;border-radius:999px;background:rgba(8,23,31,.82);color:#fff;font-size:11px;font-weight:720;letter-spacing:.1px;backdrop-filter:blur(12px)}
+    .net-status b{color:#85efc4}.net-status.offline b{color:#ffc26a}
+    .profile-nudge{position:absolute;z-index:850;top:calc(68px + var(--safe-top));right:14px;padding:8px 11px;border-radius:999px;background:rgba(255,255,255,.92);box-shadow:var(--shadow-soft);font-size:11px;font-weight:760;color:#31525a;display:flex;gap:7px;align-items:center}
+    .profile-nudge.done{display:none}.profile-nudge i{width:7px;height:7px;border-radius:50%;background:var(--warning)}
+
+    .sos-live{position:absolute;z-index:880;top:calc(104px + var(--safe-top));left:12px;right:12px;border-radius:18px;padding:12px 13px;background:linear-gradient(135deg,rgba(184,25,39,.96),rgba(235,59,69,.95));color:#fff;box-shadow:0 16px 38px rgba(153,20,34,.30);display:none;align-items:center;gap:11px}
+    .sos-live.show{display:flex}.pulse-mini{width:36px;height:36px;border-radius:50%;background:#fff;display:grid;place-items:center;color:var(--danger);font-weight:900;position:relative;flex:none}
+    .pulse-mini:after{content:"";position:absolute;inset:-5px;border:2px solid rgba(255,255,255,.6);border-radius:50%;animation:pulse 1.5s infinite}
+    @keyframes pulse{0%{transform:scale(.8);opacity:1}100%{transform:scale(1.5);opacity:0}}
+    .sos-live strong{font-size:14px;display:block}.sos-live small{font-size:11px;opacity:.87;display:block;margin-top:2px}.sos-live button{margin-left:auto;background:#fff;color:#a41625;border-radius:12px;padding:10px 12px;font-weight:820;font-size:12px}
+
+    .map-tools{position:absolute;z-index:820;right:12px;bottom:calc(var(--sheet-h) + 15px);display:grid;gap:9px;transition:.32s ease}
+    .map-tool{width:48px;height:48px;border-radius:16px;background:rgba(255,255,255,.94);box-shadow:var(--shadow-soft);display:grid;place-items:center;color:#183740;border:1px solid rgba(255,255,255,.7)}
+    .map-tool.active{background:#113842;color:#fff}
+
+    .route-mini{position:absolute;z-index:820;left:12px;right:72px;bottom:calc(var(--sheet-h) + 15px);padding:11px 12px;border-radius:17px;background:rgba(9,31,39,.92);color:#fff;box-shadow:var(--shadow-soft);display:none;align-items:center;gap:10px;backdrop-filter:blur(16px)}
+    .route-mini.show{display:flex}.route-mini .route-color{width:5px;height:36px;border-radius:5px;background:#25c89a}.route-mini strong{font-size:13px;display:block}.route-mini small{font-size:11px;opacity:.74}.route-mini button{margin-left:auto;width:40px;height:40px;border-radius:13px;background:rgba(255,255,255,.14);color:#fff;font-size:18px}
+
+    .bottom-sheet{position:absolute;z-index:1000;left:0;right:0;bottom:0;height:var(--sheet-h);background:rgba(255,255,255,.975);border-radius:28px 28px 0 0;box-shadow:0 -18px 60px rgba(5,28,36,.20);transition:height .34s cubic-bezier(.2,.8,.2,1);overflow:hidden;padding-bottom:var(--safe-bottom)}
+    .bottom-sheet.half{height:52vh}.bottom-sheet.full{height:calc(100vh - 16px - var(--safe-top))}
+    .sheet-head{height:48px;display:flex;align-items:center;padding:0 12px 0 18px;border-bottom:1px solid var(--line);position:relative}
+    .grab{position:absolute;top:7px;left:50%;transform:translateX(-50%);width:38px;height:5px;border-radius:9px;background:#c8d1d2}
+    .sheet-title{font-size:13px;font-weight:820;letter-spacing:.1px;margin-top:7px}.sheet-sub{font-size:11px;color:var(--muted);margin-left:7px;margin-top:7px}
+    .sheet-controls{margin-left:auto;display:flex;gap:4px;margin-top:7px}.sheet-controls button{width:34px;height:34px;border-radius:11px;background:#eef3f2;color:#36525a;font-weight:850}
+    .sheet-body{height:calc(100% - 48px);overflow:auto;overscroll-behavior:contain;padding:11px 12px 24px}
+    .actions{display:grid;grid-template-columns:1fr 1.15fr;gap:10px;position:sticky;top:0;z-index:4;background:linear-gradient(#fff 83%,rgba(255,255,255,0));padding-bottom:10px}
+    .action{height:58px;border-radius:18px;font-weight:850;display:flex;align-items:center;justify-content:center;gap:9px;font-size:15px}
+    .action svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.2}.report-btn{background:#e9f6f1;color:#076b57}.sos-btn{color:#fff;background:linear-gradient(135deg,#e83443,#fa655b);box-shadow:0 10px 22px rgba(229,48,65,.25);position:relative;overflow:hidden}
+    .sos-btn.holding:after{content:"";position:absolute;inset:0;background:rgba(255,255,255,.28);transform-origin:left;animation:hold 1.2s linear forwards}@keyframes hold{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+    .summary-row{display:flex;align-items:center;gap:8px;padding:1px 2px 10px;white-space:nowrap;overflow:auto;scrollbar-width:none}.summary-row::-webkit-scrollbar{display:none}.chip{height:28px;padding:0 10px;border-radius:999px;background:#f1f5f4;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:760;color:#405b62}.chip i{width:7px;height:7px;border-radius:50%}.chip.sos i{background:var(--danger)}.chip.warn i{background:var(--warning)}.chip.team i{background:var(--brand2)}
+    .sheet-content{opacity:0;pointer-events:none;transform:translateY(8px);transition:.25s}.bottom-sheet.half .sheet-content,.bottom-sheet.full .sheet-content{opacity:1;pointer-events:auto;transform:none}
+    .tabs{display:flex;gap:4px;background:#eef3f2;border-radius:14px;padding:4px;margin:1px 0 11px}.tab{height:38px;border-radius:11px;background:transparent;color:#5b7178;font-size:12px;font-weight:800;flex:1}.tab.active{background:#fff;color:#12343d;box-shadow:0 3px 12px rgba(14,40,48,.08)}
+    .panel{display:none}.panel.active{display:block}.section-title{font-size:12px;font-weight:850;text-transform:uppercase;letter-spacing:.7px;color:#49616a;margin:14px 2px 8px}
+    .incident-card,.route-card,.report-card{border:1px solid var(--line);border-radius:19px;background:#fff;padding:13px;margin-bottom:9px;box-shadow:0 4px 18px rgba(9,34,42,.05)}
+    .incident-top{display:flex;gap:10px}.incident-icon{width:43px;height:43px;border-radius:14px;background:#fff0f1;color:var(--danger);display:grid;place-items:center;font-size:20px;flex:none}.incident-card h3{font-size:14px;margin:1px 0 4px}.incident-card p{font-size:11.5px;color:var(--muted);margin:0;line-height:1.4}.badge{font-size:10px;font-weight:850;padding:5px 7px;border-radius:999px;margin-left:auto;align-self:flex-start}.badge.p1{background:#ffe7e9;color:#b51d2d}.badge.p2{background:#fff3dc;color:#9a6409}.card-actions{display:flex;gap:8px;margin-top:11px}.small-btn{height:42px;border-radius:13px;background:#eef6f3;color:#0a705b;font-weight:800;font-size:12px;padding:0 13px;flex:1}.small-btn.primary{background:#0b7e65;color:#fff}.small-btn.dark{background:#12343d;color:#fff}
+    .route-card{display:flex;gap:10px;align-items:center}.route-line{width:5px;height:48px;border-radius:5px}.route-card h4{font-size:13px;margin:0 0 4px}.route-card p{font-size:11px;color:var(--muted);margin:0}.route-metrics{margin-left:auto;text-align:right}.route-metrics b{display:block;font-size:13px}.route-metrics span{font-size:10px;color:var(--muted)}.route-card.selected{border-color:#0aa77f;box-shadow:0 0 0 2px rgba(10,167,127,.12)}
+    .empty{padding:34px 18px;text-align:center;color:#657980}.empty-icon{width:60px;height:60px;border-radius:20px;background:#eef5f3;margin:0 auto 12px;display:grid;place-items:center;font-size:26px}.empty strong{display:block;color:#29474f;font-size:14px;margin-bottom:4px}.empty p{font-size:12px;margin:0;line-height:1.5}
+
+    .overlay{position:absolute;inset:0;z-index:1400;background:rgba(1,15,21,.45);backdrop-filter:blur(5px);opacity:0;pointer-events:none;transition:.22s}.overlay.show{opacity:1;pointer-events:auto}
+    .modal{position:absolute;z-index:1500;left:50%;top:50%;transform:translate(-50%,-46%) scale(.97);width:min(430px,calc(100% - 24px));max-height:calc(100% - 32px - var(--safe-top) - var(--safe-bottom));overflow:auto;background:#fff;border-radius:26px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.22s;padding:18px}
+    .modal.show{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}.modal-head{display:flex;align-items:center;gap:10px;margin-bottom:13px}.modal-head h2{font-size:19px;margin:0}.modal-head p{font-size:11px;color:var(--muted);margin:3px 0 0}.close{margin-left:auto;width:42px;height:42px;border-radius:14px;background:#eff3f2;color:#466068;font-size:20px}
+    .types{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:13px}.type{min-height:52px;border-radius:15px;background:#f1f5f4;color:#38535b;font-weight:780;font-size:12px;padding:8px}.type.selected{background:#fff0f1;color:#b21c2c;box-shadow:inset 0 0 0 1.5px #e84654}
+    .field{margin-bottom:10px}.field label{display:block;font-size:11px;font-weight:780;color:#526a71;margin:0 0 5px 3px}.field label span{font-weight:600;color:#92a0a4}.field input,.field textarea,.field select{width:100%;min-height:48px;border:1px solid #dce5e3;background:#f8faf9;border-radius:14px;padding:11px 13px;outline:none;font-size:14px;color:#17343c}.field textarea{height:78px;resize:none}.field input:focus,.field textarea:focus,.field select:focus{border-color:#19a17f;box-shadow:0 0 0 3px rgba(25,161,127,.12)}
+    .privacy-note{padding:11px;border-radius:14px;background:#edf7f4;font-size:11px;line-height:1.45;color:#3e625d;margin:3px 0 12px}.privacy-note strong{color:#0b705c}.modal-primary{width:100%;height:54px;border-radius:17px;color:#fff;background:linear-gradient(135deg,#de2d3d,#fb645c);font-weight:850;font-size:14px}.modal-secondary{width:100%;height:48px;border-radius:15px;background:#eef3f2;color:#39545c;font-weight:800;margin-top:8px}
+    .profile-save{background:linear-gradient(135deg,#087b64,#11a27f)}
+
+    .drawer{position:absolute;z-index:1510;top:0;bottom:0;left:0;width:min(364px,90%);background:#fff;box-shadow:var(--shadow);transform:translateX(-105%);transition:.28s cubic-bezier(.2,.8,.2,1);padding:calc(16px + var(--safe-top)) 14px calc(16px + var(--safe-bottom));overflow:auto}.drawer.show{transform:none}.drawer-brand{display:flex;align-items:center;gap:11px;padding:0 4px 15px}.logo{width:45px;height:45px;border-radius:15px;background:linear-gradient(145deg,#096c59,#13a27f);color:#fff;display:grid;place-items:center;font-weight:900;font-size:18px;box-shadow:0 8px 20px rgba(8,126,101,.22)}.drawer-brand h2{font-size:18px;margin:0}.drawer-brand p{font-size:11px;color:var(--muted);margin:3px 0 0}.device-card{border-radius:18px;padding:12px;background:#102e37;color:#fff;margin-bottom:13px}.device-card small{font-size:10px;opacity:.7}.device-card b{display:block;font-size:14px;margin:3px 0}.device-card span{font-size:10px;color:#94dfc8}.menu-list{display:grid;gap:5px}.menu-item{height:52px;border-radius:15px;background:#f6f8f8;color:#27464e;padding:0 13px;display:flex;align-items:center;text-align:left;font-weight:750;font-size:13px}.menu-item .mi{width:34px;height:34px;border-radius:11px;background:#e8f1ef;display:grid;place-items:center;margin-right:10px}.menu-item .arrow{margin-left:auto;color:#8b999d}.menu-section{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#839297;font-weight:850;margin:15px 5px 7px}.legal{font-size:10px;color:#8b999d;line-height:1.5;padding:15px 6px}.danger-link{color:#b82b38!important}
+
+    .compass-view{position:absolute;z-index:1250;inset:0;background:radial-gradient(circle at 50% 35%,rgba(20,80,80,.92),rgba(3,20,27,.98) 60%);color:#fff;display:none;align-items:center;justify-content:center;flex-direction:column;padding:20px}.compass-view.show{display:flex}.compass-close{position:absolute;top:calc(14px + var(--safe-top));left:14px;width:48px;height:48px;border-radius:16px;background:rgba(255,255,255,.13);color:#fff;font-size:23px}.compass-title{font-size:12px;letter-spacing:1.3px;text-transform:uppercase;color:#a7c8c4;margin-bottom:15px}.dial{width:min(72vw,310px);aspect-ratio:1;border-radius:50%;border:1px solid rgba(255,255,255,.28);position:relative;display:grid;place-items:center;box-shadow:inset 0 0 60px rgba(111,222,193,.08),0 20px 70px rgba(0,0,0,.25)}.dial:before,.dial:after{content:"";position:absolute;background:rgba(255,255,255,.16)}.dial:before{width:1px;height:100%}.dial:after{height:1px;width:100%}.north{position:absolute;top:14px;font-size:12px;font-weight:900;color:#ff7678}.needle{width:7px;height:42%;border-radius:7px;background:linear-gradient(#ff5a61 0 50%,#dceceb 50%);transform-origin:50% 100%;position:absolute;bottom:50%;transform:rotate(38deg);box-shadow:0 0 22px rgba(255,94,99,.30);transition:transform .6s}.dial-center{width:22px;height:22px;border-radius:50%;background:#fff;border:7px solid #1f6f68;z-index:2}.bearing{font-size:38px;font-weight:850;margin-top:24px}.target{font-size:14px;font-weight:800;margin-top:4px}.distance{font-size:12px;color:#a8c8c5;margin-top:5px}.compass-actions{display:flex;gap:10px;margin-top:22px}.compass-actions button{height:48px;border-radius:15px;padding:0 16px;font-weight:800}.compass-actions .map-return{background:#fff;color:#15333b}.compass-actions .call{background:#e6414d;color:#fff}
+
+    .photo-box{height:128px;border:1.5px dashed #b8c9c5;border-radius:18px;background:#f5f8f7;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:7px;color:#517068;overflow:hidden;position:relative}.photo-box img{width:100%;height:100%;object-fit:cover;display:none}.photo-box.has img{display:block}.photo-box.has .photo-placeholder{display:none}.photo-box input{position:absolute;inset:0;opacity:0;cursor:pointer}.photo-placeholder b{display:block;text-align:center;font-size:13px}.photo-placeholder small{font-size:10px}.photo-icon{font-size:25px;text-align:center;margin-bottom:4px}
+
+    .toast{position:absolute;z-index:1900;left:50%;bottom:calc(var(--sheet-h) + 20px);transform:translate(-50%,20px);width:min(360px,calc(100% - 28px));background:#102e37;color:#fff;border-radius:16px;padding:12px 14px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.28s}.toast.show{opacity:1;transform:translate(-50%,0)}.toast strong{font-size:12px;display:block}.toast span{font-size:10.5px;color:#b7ceca;display:block;margin-top:3px}
+
+    .custom-pin{position:relative;width:42px;height:42px;border-radius:16px 16px 16px 5px;transform:rotate(-45deg);display:grid;place-items:center;box-shadow:0 7px 18px rgba(4,26,34,.27);border:3px solid #fff}.custom-pin span{transform:rotate(45deg);font-size:16px}.pin-sos{background:#e83c49}.pin-warn{background:#ef9e1d}.pin-team{background:#0b9a79}.pin-me{background:#267bd5}.custom-pin.live:after{content:"";position:absolute;inset:-9px;border-radius:50%;border:2px solid currentColor;animation:pulse 1.7s infinite;color:#e83c49}
+    .leaflet-div-icon{background:transparent!important;border:0!important}
+
+    .language-gate{position:fixed;inset:0;z-index:3200;display:none;align-items:center;justify-content:center;padding:calc(20px + var(--safe-top)) 18px calc(20px + var(--safe-bottom));background:linear-gradient(155deg,#edf6f2 0%,#d9e9e3 48%,#c8ddd5 100%)}
+    .language-gate.show{display:flex}.language-gate:before,.language-gate:after{content:"";position:absolute;border-radius:50%;filter:blur(2px);pointer-events:none}.language-gate:before{width:290px;height:290px;right:-100px;top:-95px;background:rgba(11,165,127,.16)}.language-gate:after{width:240px;height:240px;left:-100px;bottom:-80px;background:rgba(36,119,212,.10)}
+    .language-card{position:relative;width:min(430px,100%);background:rgba(255,255,255,.94);border:1px solid rgba(255,255,255,.78);border-radius:30px;padding:26px 20px 20px;box-shadow:0 28px 90px rgba(4,30,37,.20);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px)}
+    .language-brand{display:flex;align-items:center;gap:13px;margin-bottom:25px}.language-logo{width:58px;height:58px;border-radius:19px;background:linear-gradient(145deg,#076d59,#13a982);color:#fff;display:grid;place-items:center;font-size:20px;font-weight:950;box-shadow:0 12px 28px rgba(8,126,101,.25)}.language-brand h1{font-size:24px;line-height:1.05;margin:0}.language-brand p{font-size:12px;color:var(--muted);margin:5px 0 0}
+    .language-card h2{font-size:20px;margin:0 0 5px}.language-card>.language-copy{font-size:13px;color:var(--muted);line-height:1.5;margin:0 0 16px}
+    .language-choice-list{display:grid;gap:10px}.language-choice{min-height:68px;border-radius:18px;background:#f3f7f5;border:1.5px solid transparent;color:#29464e;padding:0 15px;display:flex;align-items:center;gap:13px;text-align:left}.language-choice .flag{font-size:26px}.language-choice strong{display:block;font-size:15px}.language-choice small{display:block;font-size:11px;color:#7b8d92;margin-top:3px}.language-choice .check{margin-left:auto;width:24px;height:24px;border-radius:50%;border:2px solid #b9c8c5;display:grid;place-items:center;color:transparent;font-size:13px;font-weight:900}.language-choice.selected{background:#eaf7f2;border-color:#0b9878;color:#075f4e;box-shadow:0 0 0 3px rgba(11,152,120,.08)}.language-choice.selected .check{background:#0b9878;border-color:#0b9878;color:#fff}
+    .language-continue{width:100%;height:56px;border-radius:18px;margin-top:17px;background:linear-gradient(135deg,#087b64,#11a27f);color:#fff;font-size:15px;font-weight:880;box-shadow:0 12px 26px rgba(8,126,101,.23)}.language-footnote{text-align:center;font-size:10.5px;color:#829397;line-height:1.45;margin:12px 8px 0}
+
+    @media(min-width:760px){
+      :root{--sheet-h:172px}.bottom-sheet{left:auto;right:16px;bottom:16px;width:430px;border-radius:28px;padding-bottom:0}.bottom-sheet.half{height:min(590px,70vh)}.bottom-sheet.full{height:calc(100vh - 32px);width:470px}.topbar{right:auto;width:560px}.sos-live{right:auto;width:540px}.map-tools{right:calc(446px + 28px);bottom:16px}.route-mini{left:16px;right:auto;width:410px;bottom:16px}.leaflet-control-attribution{margin-bottom:2px!important}.toast{bottom:32px}.profile-nudge{right:22px}.net-status{left:22px}.drawer{width:380px}.sheet-content{opacity:1;pointer-events:auto;transform:none}.bottom-sheet:not(.half):not(.full) .sheet-content{opacity:0;pointer-events:none}.actions{grid-template-columns:1fr 1.12fr}}
+    @media(max-width:430px){.search span{font-size:13.5px}.topbar{gap:7px}.round-btn{width:46px;height:46px}.search{height:46px}.profile-nudge{max-width:145px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.modal{padding:16px}.types{gap:7px}.bottom-sheet.full{height:calc(100vh - 8px - var(--safe-top))}}
+  </style>
+</head>
+<body>
+<div class="language-gate" id="languageGate" role="dialog" aria-modal="true" aria-labelledby="languageGateTitle">
+  <section class="language-card">
+    <div class="language-brand"><div class="language-logo">AĐ</div><div><h1>An Đồ</h1><p id="languageBrandSub">Bản đồ SOS cộng đồng</p></div></div>
+    <h2 id="languageGateTitle">Chọn ngôn ngữ</h2>
+    <p class="language-copy" id="languageGateCopy">Chọn ngôn ngữ để bắt đầu. Tiếng Việt được chọn sẵn.</p>
+    <div class="language-choice-list" role="radiogroup" aria-label="Ngôn ngữ">
+      <button class="language-choice selected" type="button" data-onboarding-language="vi" role="radio" aria-checked="true">
+        <span class="flag">🇻🇳</span><span><strong>Tiếng Việt</strong><small>Ngôn ngữ mặc định</small></span><span class="check">✓</span>
+      </button>
+      <button class="language-choice" type="button" data-onboarding-language="en" role="radio" aria-checked="false">
+        <span class="flag">🇬🇧</span><span><strong>English</strong><small>English language</small></span><span class="check">✓</span>
+      </button>
+    </div>
+    <button class="language-continue" id="languageContinue" type="button">Tiếp tục</button>
+    <p class="language-footnote" id="languageFootnote">Bạn có thể thay đổi ngôn ngữ sau trong Menu → Ngôn ngữ.</p>
+  </section>
+</div>
+<script>
+  (()=>{try{if(JSON.parse(localStorage.getItem('languageConfirmed')||'false')!==true)document.getElementById('languageGate').classList.add('show')}catch{document.getElementById('languageGate').classList.add('show')}})();
+</script>
+<div class="app" id="app">
+  <div id="map"></div><div class="map-dim"></div>
+
+  <header class="topbar">
+    <button class="round-btn glass" id="menuBtn" aria-label="Mở menu">
+      <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+    </button>
+    <button class="search glass" id="searchBtn" aria-label="Tìm địa điểm">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+      <span id="searchText">Tìm địa điểm hoặc mã SOS…</span>
+      <i class="status-dot"></i>
+    </button>
+  </header>
+  <div class="net-status" id="netStatus"><span>●</span><b>ONLINE</b><span>· GPS ±6 m</span></div>
+  <button class="profile-nudge" id="profileNudge"><i></i> Thêm liên hệ khẩn cấp</button>
+
+  <div class="sos-live" id="sosLive">
+    <div class="pulse-mini">SOS</div>
+    <div><strong>SOS đang được phát</strong><small id="sosLiveMeta">Vị trí vừa cập nhật · GPS ±6 m · Pin 68%</small></div>
+    <button id="openSosStatus">Xem</button>
+  </div>
+
+  <div class="map-tools" id="mapTools">
+    <button class="map-tool" id="locateBtn" aria-label="Vị trí của tôi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg></button>
+    <button class="map-tool" id="compassBtn" aria-label="La bàn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15 9-2 4-4 2 2-4z"/></svg></button>
+    <button class="map-tool" id="layersBtn" aria-label="Lớp bản đồ"><svg viewBox="0 0 24 24"><path d="m12 3 8 4-8 4-8-4zM4 12l8 4 8-4M4 17l8 4 8-4"/></svg></button>
+  </div>
+
+  <div class="route-mini" id="routeMini"><i class="route-color" id="routeMiniColor"></i><div><strong id="routeMiniTitle">Tuyến an toàn · 12 phút</strong><small id="routeMiniSub">3,8 km · tránh 2 cảnh báo</small></div><button id="routeMiniOpen">⌃</button></div>
+
+  <section class="bottom-sheet" id="sheet">
+    <div class="sheet-head" id="sheetDrag"><i class="grab"></i><strong class="sheet-title" id="sheetTitle">An Đồ gần bạn</strong><span class="sheet-sub" id="sheetSub">Cập nhật vừa xong</span>
+      <div class="sheet-controls"><button id="sheetMin" aria-label="Thu gọn">⌄</button><button id="sheetHalf" aria-label="Nửa màn hình">—</button><button id="sheetFull" aria-label="Mở rộng">⌃</button></div>
+    </div>
+    <div class="sheet-body">
+      <div class="actions">
+        <button class="action report-btn" id="reportRoadBtn"><svg viewBox="0 0 24 24"><path d="M4 7h4l2-2h4l2 2h4v12H4z"/><circle cx="12" cy="13" r="3"/></svg>Báo đường</button>
+        <button class="action sos-btn" id="sosBtn"><svg viewBox="0 0 24 24"><path d="M12 3 3 20h18z"/><path d="M12 9v5M12 17h.01"/></svg><span id="sosBtnText">Giữ để SOS</span></button>
+      </div>
+      <div class="summary-row">
+        <span class="chip sos"><i></i><b>3</b> SOS đang hoạt động</span>
+        <span class="chip warn"><i></i><b>2</b> cảnh báo đường</span>
+        <span class="chip team"><i></i><b>4</b> người đang hỗ trợ</span>
+      </div>
+      <div class="sheet-content">
+        <div class="tabs"><button class="tab active" data-tab="nearby">Gần tôi</button><button class="tab" data-tab="rescue">Đang hỗ trợ</button><button class="tab" data-tab="routes">Tuyến đường</button></div>
+        <div class="panel active" id="panel-nearby">
+          <div class="section-title">SOS đang công khai gần bạn</div>
+          <div id="incidentList"></div>
+          <div class="section-title">Cảnh báo trên đường</div>
+          <div class="report-card"><div class="incident-top"><div class="incident-icon" style="background:#fff5df;color:#b66b00">⚠</div><div><h3>Ngập sâu khoảng 40–50 cm</h3><p>Cầu Chương Dương · 4 phút trước · 7 người xác nhận</p></div><span class="badge p2">P2</span></div><div class="card-actions"><button class="small-btn">Xem ảnh</button><button class="small-btn dark" id="avoidWarningBtn">Tránh điểm này</button></div></div>
+        </div>
+        <div class="panel" id="panel-rescue"><div class="empty" id="rescueEmpty"><div class="empty-icon">🛟</div><strong>Chưa nhận hỗ trợ ca nào</strong><p>Chọn một SOS đang hoạt động. Chỉ vị trí được người dùng chủ động phát SOS mới hiển thị.</p></div><div id="rescueActive" style="display:none"></div></div>
+        <div class="panel" id="panel-routes"><div class="empty" id="routesEmpty"><div class="empty-icon">🧭</div><strong>Chưa có điểm cứu hộ</strong><p>Chọn “Hỗ trợ ca này” để An Đồ đề xuất các tuyến tiếp cận.</p></div><div id="routeList" style="display:none"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="overlay" id="overlay"></div>
+  <aside class="drawer" id="drawer">
+    <div class="drawer-brand"><div class="logo">AĐ</div><div><h2>An Đồ</h2><p>Bản đồ SOS cộng đồng</p></div><button class="close" id="drawerClose">×</button></div>
+    <div class="device-card"><small>Thiết bị được nhận diện tự động</small><b id="deviceLabel">Thiết bị AĐ-——</b><span>Firebase Anonymous · không cần đăng nhập</span></div>
+    <div class="menu-section">Cá nhân và an toàn</div>
+    <div class="menu-list">
+      <button class="menu-item" id="profileMenu"><span class="mi">👤</span>Hồ sơ SOS của tôi<span class="arrow">›</span></button>
+      <button class="menu-item" id="contactMenu"><span class="mi">☎</span>Người liên hệ khẩn cấp<span class="arrow">›</span></button>
+      <button class="menu-item" id="permissionMenu"><span class="mi">◎</span>Quyền và chạy nền<span class="arrow">›</span></button>
+    </div>
+    <div class="menu-section">Bản đồ và dữ liệu</div>
+    <div class="menu-list">
+      <button class="menu-item" id="offlineMenu"><span class="mi">⇩</span>Bản đồ offline<span class="arrow">›</span></button>
+      <button class="menu-item" id="privacyMenu"><span class="mi">⌾</span>Riêng tư và dữ liệu<span class="arrow">›</span></button>
+      <button class="menu-item" id="languageMenu"><span class="mi">文</span><span>Ngôn ngữ</span><span class="arrow" id="languageValue">Tiếng Việt</span></button>
+    </div>
+    <div class="menu-section">Khác</div>
+    <div class="menu-list"><button class="menu-item" id="aboutMenu"><span class="mi">i</span>Giới thiệu An Đồ<span class="arrow">›</span></button><button class="menu-item danger-link" id="resetMenu"><span class="mi">↺</span>Xóa dữ liệu demo<span class="arrow">›</span></button></div>
+    <p class="legal">An Đồ hỗ trợ chia sẻ vị trí và kết nối cộng đồng. Ứng dụng không thay thế lực lượng cứu hộ chính thức và không bảo đảm yêu cầu luôn được tiếp nhận.</p>
+  </aside>
+
+  <div class="modal" id="sosModal">
+    <div class="modal-head"><div><h2>Phát tín hiệu SOS</h2><p>Vị trí trực tiếp chỉ chia sẻ trong phiên SOS này</p></div><button class="close modalClose">×</button></div>
+    <div class="types" id="sosTypes"><button class="type selected" data-type="Ngập lụt">🌊 Ngập lụt</button><button class="type" data-type="Bị lạc">🧭 Bị lạc</button><button class="type" data-type="Bị thương">🩹 Bị thương</button><button class="type" data-type="Nguy hiểm khác">⚠ Nguy hiểm khác</button></div>
+    <div class="field"><label>Tên <span>— không bắt buộc</span></label><input id="sosName" placeholder="Đội cứu hộ nên gọi bạn là gì?" /></div>
+    <div class="field"><label>Số điện thoại <span>— không bắt buộc</span></label><input id="sosPhone" inputmode="tel" placeholder="Giúp liên hệ nhanh hơn" /></div>
+    <div class="field"><label>Email <span>— không bắt buộc</span></label><input id="sosEmail" inputmode="email" placeholder="name@example.com" /></div>
+    <div class="field"><label>Số người cần hỗ trợ</label><select id="sosPeople"><option>1</option><option>2</option><option>3</option><option>4</option><option>5+</option></select></div>
+    <div class="field"><label>Mô tả ngắn <span>— không bắt buộc</span></label><textarea id="sosNote" placeholder="Ví dụ: đang ở tầng 2, nước tiếp tục dâng…"></textarea></div>
+    <div class="privacy-note"><strong>Bạn vẫn có thể phát SOS khi để trống tất cả thông tin.</strong> Tên và liên hệ sẽ được lưu trên thiết bị để điền nhanh lần sau; chỉ gửi lên khi bạn chủ động phát SOS.</div>
+    <button class="modal-primary" id="startSosBtn">Phát SOS ngay</button><button class="modal-secondary modalClose">Hủy</button>
+  </div>
+
+  <div class="modal" id="sosStatusModal">
+    <div class="modal-head"><div><h2>SOS đang hoạt động</h2><p id="sosStatusCode">Mã SOS: AĐ-000000</p></div><button class="close modalClose">×</button></div>
+    <div class="incident-card" style="background:#fff7f7"><div class="incident-top"><div class="incident-icon">🛟</div><div><h3 id="statusType">Ngập lụt · 1 người</h3><p id="statusUpdate">Đã gửi 1 điểm vị trí · GPS ±6 m</p></div><span class="badge p1">ĐANG PHÁT</span></div></div>
+    <div class="privacy-note">Foreground Service đang mô phỏng cập nhật vị trí khi màn hình tắt. Nếu mất mạng, vị trí được lưu cục bộ và gửi bù khi có kết nối.</div>
+    <button class="modal-primary" id="call112Btn">Gọi 112</button><button class="modal-secondary" id="endSosBtn" style="color:#b72b38">Kết thúc SOS — Tôi đã an toàn</button>
+  </div>
+
+  <div class="modal" id="reportModal">
+    <div class="modal-head"><div><h2>Báo đoạn đường</h2><p>Ảnh được nén đủ rõ để xem khi mạng yếu</p></div><button class="close modalClose">×</button></div>
+    <div class="photo-box" id="photoBox"><img id="photoPreview" alt="Ảnh hiện trường"/><div class="photo-placeholder"><div class="photo-icon">📷</div><b>Chụp hoặc chọn ảnh</b><small>Tối đa 3 ảnh · bản đầu dùng 1 ảnh</small></div><input type="file" id="photoInput" accept="image/*" capture="environment" /></div>
+    <div class="field" style="margin-top:11px"><label>Vấn đề trên đường</label><select id="roadType"><option>Ngập</option><option>Sạt lở</option><option>Cây đổ</option><option>Đường bị chặn</option><option>Cầu hỏng</option><option>Dây điện nguy hiểm</option><option>Khác</option></select></div>
+    <div class="field"><label>Mức độ</label><select id="roadSeverity"><option value="P2">Cần chú ý</option><option value="P1">Rất nguy hiểm</option><option value="P3">Có thể đi chậm</option></select></div>
+    <div class="field"><label>Ghi chú <span>— không bắt buộc</span></label><textarea id="roadNote" placeholder="Ví dụ: xe máy còn đi sát mép trái…"></textarea></div>
+    <div class="privacy-note">Tọa độ được lấy tự động. Ảnh mô phỏng sẽ được nén cạnh dài 1440 px, JPEG 80% và bỏ metadata không cần thiết.</div>
+    <button class="modal-primary profile-save" id="submitReportBtn">Gửi cảnh báo đường</button><button class="modal-secondary modalClose">Hủy</button>
+  </div>
+
+  <div class="modal" id="profileModal">
+    <div class="modal-head"><div><h2>Hồ sơ SOS</h2><p>Không bắt buộc — lưu riêng trên thiết bị</p></div><button class="close modalClose">×</button></div>
+    <div class="field"><label>Tên hiển thị</label><input id="profileName" placeholder="Tên của bạn" /></div><div class="field"><label>Số điện thoại</label><input id="profilePhone" inputmode="tel" placeholder="Số liên hệ" /></div><div class="field"><label>Email</label><input id="profileEmail" inputmode="email" placeholder="Email liên hệ" /></div>
+    <div class="privacy-note"><strong>An Đồ không cần thông tin này để mở bản đồ.</strong> Dữ liệu chỉ được đưa vào yêu cầu SOS khi bạn nhìn thấy và chủ động xác nhận.</div>
+    <button class="modal-primary profile-save" id="saveProfileBtn">Lưu trên thiết bị</button>
+  </div>
+
+  <div class="modal" id="layersModal">
+    <div class="modal-head"><div><h2>Lớp bản đồ</h2><p>Chỉ hiển thị dữ liệu cần thiết</p></div><button class="close modalClose">×</button></div>
+    <div class="menu-list"><button class="menu-item" data-layer="sos"><span class="mi">🛟</span>SOS đang hoạt động<span class="arrow">✓</span></button><button class="menu-item" data-layer="warn"><span class="mi">⚠</span>Cảnh báo đường<span class="arrow">✓</span></button><button class="menu-item" data-layer="team"><span class="mi">🚑</span>Người đang hỗ trợ<span class="arrow">✓</span></button></div>
+    <div class="menu-section">Kiểu bản đồ</div><div class="types"><button class="type selected" data-mapstyle="standard">Tiêu chuẩn</button><button class="type" data-mapstyle="terrain">Địa hình</button></div>
+  </div>
+
+
+  <div class="modal" id="languageModal">
+    <div class="modal-head"><div><h2>Ngôn ngữ</h2><p>Chọn ngôn ngữ hiển thị của ứng dụng</p></div><button class="close modalClose">×</button></div>
+    <div class="types" id="languageOptions">
+      <button class="type" data-language="vi">🇻🇳 Tiếng Việt</button>
+      <button class="type" data-language="en">🇬🇧 English</button>
+    </div>
+    <div class="privacy-note"><strong>Ứng dụng chỉ dùng một giao diện thống nhất.</strong> Lựa chọn ngôn ngữ được lưu trên thiết bị và có thể thay đổi bất cứ lúc nào.</div>
+  </div>
+
+  <div class="modal" id="offlineModal"><div class="modal-head"><div><h2>Bản đồ offline</h2><p>Mở rộng sau — mô phỏng luồng tải</p></div><button class="close modalClose">×</button></div><div class="incident-card"><h3 style="margin:0 0 5px">Khu vực quanh vị trí hiện tại</h3><p style="margin:0;color:var(--muted);font-size:12px">Dùng được khi mất mạng để xem GPS và la bàn.</p></div><div class="types"><button class="type selected" data-radius="5">5 km · 38 MB</button><button class="type" data-radius="10">10 km · 84 MB</button><button class="type" data-radius="30">30 km · 260 MB</button><button class="type" data-radius="province">Toàn tỉnh</button></div><button class="modal-primary profile-save" id="downloadOfflineBtn">Tải khu vực 5 km</button></div>
+
+  <div class="modal" id="genericModal"><div class="modal-head"><div><h2 id="genericTitle">Thông tin</h2><p id="genericSub">An Đồ</p></div><button class="close modalClose">×</button></div><div id="genericBody"></div></div>
+
+  <div class="compass-view" id="compassView"><button class="compass-close" id="compassClose">×</button><div class="compass-title">Hướng đến người cần hỗ trợ</div><div class="dial"><span class="north">N</span><i class="needle" id="needle"></i><i class="dial-center"></i></div><div class="bearing" id="bearingText">038° NE</div><div class="target" id="compassTarget">SOS AĐ-742819 · Ngập lụt</div><div class="distance" id="compassDistance">Cách 3,8 km · cập nhật 8 giây trước</div><div class="compass-actions"><button class="map-return" id="compassMapReturn">Xem bản đồ</button><button class="call" id="compassCall">Gọi người báo</button></div></div>
+
+  <div class="toast" id="toast"><strong id="toastTitle">Đã cập nhật</strong><span id="toastText">Thông tin mới đã được lưu.</span></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+(() => {
+  const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+  const store = {
+    get(k, fallback=''){ try{return JSON.parse(localStorage.getItem(k)) ?? fallback}catch{return fallback}},
+    set(k,v){localStorage.setItem(k,JSON.stringify(v))}
+  };
+  const state = { sheet:'min', selectedIncident:null, selectedRoute:'safe', sos:false, sosPoints:0, nav:false, navIndex:0, photo:null, selectedSosType:'Ngập lụt' };
+  const currentLanguage = store.get('language', 'vi');
+  const needsLanguageChoice = store.get('languageConfirmed', false) !== true;
+  const en = new Map(Object.entries({
+    'An Đồ — Bản đồ SOS cộng đồng':'An Đồ — Community SOS Map',
+    'Tìm địa điểm hoặc mã SOS…':'Search a place or SOS code…',
+    'Thêm liên hệ khẩn cấp':'Add emergency contact',
+    'SOS đang được phát':'SOS is broadcasting',
+    'Vị trí vừa cập nhật · GPS ±6 m · Pin 68%':'Location just updated · GPS ±6 m · Battery 68%',
+    'Xem':'View',
+    'Tuyến an toàn · 12 phút':'Safer route · 12 min',
+    '3,8 km · tránh 2 cảnh báo':'3.8 km · avoids 2 alerts',
+    'An Đồ gần bạn':'An Đồ near you',
+    'Cập nhật vừa xong':'Updated just now',
+    'Báo đường':'Report road',
+    'Giữ để SOS':'Hold for SOS',
+    'SOS đang hoạt động':'active SOS',
+    'cảnh báo đường':'road alerts',
+    'người đang hỗ trợ':'helpers active',
+    'Gần tôi':'Nearby',
+    'Đang hỗ trợ':'Assisting',
+    'Tuyến đường':'Routes',
+    'SOS đang công khai gần bạn':'Public SOS near you',
+    'Cảnh báo trên đường':'Road alerts',
+    'Ngập sâu khoảng 40–50 cm':'Flood depth about 40–50 cm',
+    'Cầu Chương Dương · 4 phút trước · 7 người xác nhận':'Chương Dương Bridge · 4 min ago · confirmed by 7 people',
+    'Xem ảnh':'View photo',
+    'Tránh điểm này':'Avoid this point',
+    'Chưa nhận hỗ trợ ca nào':'No rescue case accepted',
+    'Chọn một SOS đang hoạt động. Chỉ vị trí được người dùng chủ động phát SOS mới hiển thị.':'Choose an active SOS. Only locations deliberately shared by users are shown.',
+    'Chưa có điểm cứu hộ':'No rescue target selected',
+    'Chọn “Hỗ trợ ca này” để An Đồ đề xuất các tuyến tiếp cận.':'Choose “Assist this case” for suggested access routes.',
+    'Bản đồ SOS cộng đồng':'Community SOS Map',
+    'Thiết bị được nhận diện tự động':'Device identified automatically',
+    'Firebase Anonymous · không cần đăng nhập':'Firebase Anonymous · no sign-in required',
+    'Cá nhân và an toàn':'Personal and safety',
+    'Hồ sơ SOS của tôi':'My SOS profile',
+    'Người liên hệ khẩn cấp':'Emergency contacts',
+    'Quyền và chạy nền':'Permissions and background',
+    'Bản đồ và dữ liệu':'Map and data',
+    'Bản đồ offline':'Offline map',
+    'Riêng tư và dữ liệu':'Privacy and data',
+    'Ngôn ngữ':'Language',
+    'Tiếng Việt':'Vietnamese',
+    'Khác':'Other',
+    'Giới thiệu An Đồ':'About An Đồ',
+    'Xóa dữ liệu demo':'Delete demo data',
+    'An Đồ hỗ trợ chia sẻ vị trí và kết nối cộng đồng. Ứng dụng không thay thế lực lượng cứu hộ chính thức và không bảo đảm yêu cầu luôn được tiếp nhận.':'An Đồ supports location sharing and community response. It does not replace official emergency services and cannot guarantee that every request will be received.',
+    'Phát tín hiệu SOS':'Send an SOS',
+    'Vị trí trực tiếp chỉ chia sẻ trong phiên SOS này':'Live location is shared only during this SOS session',
+    '🌊 Ngập lụt':'🌊 Flooding',
+    '🧭 Bị lạc':'🧭 Lost',
+    '🩹 Bị thương':'🩹 Injured',
+    '⚠ Nguy hiểm khác':'⚠ Other danger',
+    'Tên':'Name',
+    '— không bắt buộc':'— optional',
+    'Số điện thoại':'Phone number',
+    'Số người cần hỗ trợ':'People needing help',
+    'Mô tả ngắn':'Short description',
+    'Bạn vẫn có thể phát SOS khi để trống tất cả thông tin.':'You can still send an SOS with every field empty.',
+    'Tên và liên hệ sẽ được lưu trên thiết bị để điền nhanh lần sau; chỉ gửi lên khi bạn chủ động phát SOS.':'Name and contact details are saved on this device for faster reuse and sent only when you deliberately start an SOS.',
+    'Phát SOS ngay':'Send SOS now',
+    'Hủy':'Cancel',
+    'Mã SOS: AĐ-000000':'SOS code: AĐ-000000',
+    'Ngập lụt · 1 người':'Flooding · 1 person',
+    'Đã gửi 1 điểm vị trí · GPS ±6 m':'Sent 1 location point · GPS ±6 m',
+    'ĐANG PHÁT':'LIVE',
+    'Foreground Service đang mô phỏng cập nhật vị trí khi màn hình tắt. Nếu mất mạng, vị trí được lưu cục bộ và gửi bù khi có kết nối.':'The Foreground Service simulates location updates while the screen is off. If the connection is lost, locations are queued locally and uploaded later.',
+    'Gọi 112':'Call 112',
+    'Kết thúc SOS — Tôi đã an toàn':'End SOS — I am safe',
+    'Báo đoạn đường':'Report road issue',
+    'Ảnh được nén đủ rõ để xem khi mạng yếu':'Images are compressed for clear viewing on weak networks',
+    'Chụp hoặc chọn ảnh':'Take or choose a photo',
+    'Tối đa 3 ảnh · bản đầu dùng 1 ảnh':'Up to 3 photos · this prototype uses 1',
+    'Vấn đề trên đường':'Road issue',
+    'Ngập':'Flooding',
+    'Sạt lở':'Landslide',
+    'Cây đổ':'Fallen tree',
+    'Đường bị chặn':'Road blocked',
+    'Cầu hỏng':'Damaged bridge',
+    'Dây điện nguy hiểm':'Dangerous power line',
+    'Mức độ':'Severity',
+    'Cần chú ý':'Caution',
+    'Rất nguy hiểm':'Very dangerous',
+    'Có thể đi chậm':'Passable slowly',
+    'Ghi chú':'Note',
+    'Tọa độ được lấy tự động. Ảnh mô phỏng sẽ được nén cạnh dài 1440 px, JPEG 80% và bỏ metadata không cần thiết.':'Coordinates are captured automatically. The prototype compresses images to a 1440 px long edge, JPEG 80%, and removes unnecessary metadata.',
+    'Gửi cảnh báo đường':'Send road alert',
+    'Hồ sơ SOS':'SOS profile',
+    'Không bắt buộc — lưu riêng trên thiết bị':'Optional — stored privately on this device',
+    'Tên hiển thị':'Display name',
+    'An Đồ không cần thông tin này để mở bản đồ.':'An Đồ does not require this information to open the map.',
+    'Dữ liệu chỉ được đưa vào yêu cầu SOS khi bạn nhìn thấy và chủ động xác nhận.':'The data is added to an SOS request only after you review and confirm it.',
+    'Lưu trên thiết bị':'Save on device',
+    'Lớp bản đồ':'Map layers',
+    'Chỉ hiển thị dữ liệu cần thiết':'Show only necessary data',
+    'Cảnh báo đường':'Road alerts',
+    'Người đang hỗ trợ':'Active helpers',
+    'Kiểu bản đồ':'Map style',
+    'Tiêu chuẩn':'Standard',
+    'Địa hình':'Terrain',
+    'Chọn ngôn ngữ hiển thị của ứng dụng':'Choose the app display language',
+    'Ứng dụng chỉ dùng một giao diện thống nhất.':'The app uses one consistent visual design.',
+    'Lựa chọn ngôn ngữ được lưu trên thiết bị và có thể thay đổi bất cứ lúc nào.':'Your language choice is stored on this device and can be changed at any time.',
+    'Mở rộng sau — mô phỏng luồng tải':'Future expansion — download flow simulation',
+    'Khu vực quanh vị trí hiện tại':'Area around current location',
+    'Dùng được khi mất mạng để xem GPS và la bàn.':'Available without internet for GPS and compass use.',
+    'Toàn tỉnh':'Entire province',
+    'Tải khu vực 5 km':'Download 5 km area',
+    'Thông tin':'Information',
+    'Hướng đến người cần hỗ trợ':'Direction to the person needing help',
+    'SOS AĐ-742819 · Ngập lụt':'SOS AĐ-742819 · Flooding',
+    'Cách 3,8 km · cập nhật 8 giây trước':'3.8 km away · updated 8 seconds ago',
+    'Xem bản đồ':'View map',
+    'Gọi người báo':'Call reporter',
+    'Đã cập nhật':'Updated',
+    'Thông tin mới đã được lưu.':'New information has been saved.',
+    'Đội cứu hộ nên gọi bạn là gì?':'What should rescuers call you?',
+    'Giúp liên hệ nhanh hơn':'Helps rescuers contact you faster',
+    'Ví dụ: đang ở tầng 2, nước tiếp tục dâng…':'Example: on the second floor, water is still rising…',
+    'Ảnh hiện trường':'Scene photo',
+    'Ví dụ: xe máy còn đi sát mép trái…':'Example: motorcycles can still pass along the left edge…',
+    'Tên của bạn':'Your name',
+    'Số liên hệ':'Contact number',
+    'Email liên hệ':'Contact email',
+    'Mở menu':'Open menu',
+    'Tìm địa điểm':'Search location',
+    'Vị trí của tôi':'My location',
+    'La bàn':'Compass',
+    'Thu gọn':'Collapse',
+    'Nửa màn hình':'Half screen',
+    'Mở rộng':'Expand'
+  }));
+  function translateText(value){
+    if(currentLanguage !== 'en' || value == null) return value;
+    const leading = String(value).match(/^\s*/)?.[0] || '';
+    const trailing = String(value).match(/\s*$/)?.[0] || '';
+    let core = String(value).trim();
+    if(en.has(core)) return leading + en.get(core) + trailing;
+    core = core
+      .replace(/Ngập lụt/g,'Flooding').replace(/Bị thương/g,'Injured').replace(/Bị lạc/g,'Lost')
+      .replace(/Hỏng phương tiện/g,'Vehicle breakdown').replace(/Nguy hiểm khác/g,'Other danger')
+      .replace(/Tuyến an toàn/g,'Safer route').replace(/Tuyến nhanh nhất/g,'Fastest route').replace(/Tuyến đi bộ/g,'Walking route')
+      .replace(/Tránh (\d+) cảnh báo/g,'Avoids $1 alerts').replace(/Đi qua (\d+) điểm ngập/g,'Passes $1 flooded point')
+      .replace(/Hẻm nhỏ · ít xe/g,'Narrow lanes · light traffic')
+      .replace(/(\d+)\s+người xác nhận/g,'confirmed by $1 people')
+      .replace(/(\d+)\s+người/g,(_,n)=>`${n} ${n==='1'?'person':'people'}`)
+      .replace(/(\d+)\s+phút trước/g,'$1 min ago').replace(/(\d+)\s+giây trước/g,'$1 sec ago')
+      .replace(/(\d+)\s+phút/g,'$1 min').replace(/cập nhật/g,'updated').replace(/Pin/g,'Battery').replace(/pin/g,'battery')
+      .replace(/Vị trí/g,'Location').replace(/Đã gửi/g,'Sent').replace(/điểm vị trí/g,'location points')
+      .replace(/Thiết bị/g,'Device').replace(/Không cần đăng nhập/g,'No sign-in required')
+      .replace(/Cách\s+/g,'Away ');
+    return leading + core + trailing;
+  }
+  function translateElement(root=document){
+    if(currentLanguage !== 'en') return;
+    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+    const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(n=>{ if(n.parentElement?.closest('script,style')) return; const v=translateText(n.nodeValue); if(v!==n.nodeValue)n.nodeValue=v; });
+    root.querySelectorAll?.('[placeholder],[aria-label],[alt],[title]').forEach(el=>{
+      ['placeholder','aria-label','alt','title'].forEach(a=>{if(el.hasAttribute(a))el.setAttribute(a,translateText(el.getAttribute(a)))});
+    });
+    document.title=translateText('An Đồ — Bản đồ SOS cộng đồng');
+  }
+  function initI18n(){
+    document.documentElement.lang=currentLanguage;
+    const value=document.getElementById('languageValue'); if(value)value.textContent=currentLanguage==='vi'?'Tiếng Việt':'English';
+    document.querySelectorAll('[data-language]').forEach(b=>b.classList.toggle('selected',b.dataset.language===currentLanguage));
+    translateElement(document.body);
+    const observer=new MutationObserver(mutations=>mutations.forEach(m=>m.addedNodes.forEach(n=>{
+      if(n.nodeType===Node.TEXT_NODE){const v=translateText(n.nodeValue);if(v!==n.nodeValue)n.nodeValue=v}
+      else if(n.nodeType===Node.ELEMENT_NODE)translateElement(n);
+    })));
+    observer.observe(document.body,{childList:true,subtree:true,characterData:true});
+  }
+
+  const me=[21.02755,105.83535];
+  const incidents=[
+    {id:'AĐ-742819',type:'Ngập lụt',people:4,lat:21.0486,lng:105.8187,dist:'3,8 km',time:'8 giây trước',battery:42,accuracy:7,note:'Đang mắc kẹt ở tầng 2, nước tiếp tục dâng.',priority:'P1',name:'Minh Anh'},
+    {id:'AĐ-291604',type:'Bị thương',people:1,lat:21.0178,lng:105.8068,dist:'4,6 km',time:'42 giây trước',battery:61,accuracy:11,note:'Ngã xe, chân khó di chuyển.',priority:'P1',name:'Người dùng An Đồ'},
+    {id:'AĐ-508337',type:'Hỏng phương tiện',people:2,lat:21.0610,lng:105.8510,dist:'5,1 km',time:'2 phút trước',battery:73,accuracy:8,note:'Xe chết máy ở khu vực ngập.',priority:'P2',name:'Hoàng Nam'}
+  ];
+  const warnings=[
+    {lat:21.0390,lng:105.8260,type:'Ngập',label:'Ngập sâu 40–50 cm'},
+    {lat:21.0450,lng:105.8208,type:'Cây đổ',label:'Cây đổ chắn nửa đường'}
+  ];
+  const teams=[{lat:21.0240,lng:105.8420,label:'Nhóm hỗ trợ HN-07'},{lat:21.0580,lng:105.8330,label:'Tình nguyện viên gần nhất'}];
+  const routes={
+    safe:{name:'Tuyến an toàn',eta:'12 phút',distance:'3,8 km',risk:'Tránh 2 cảnh báo',color:'#20bd91',coords:[[21.02755,105.83535],[21.031,105.831],[21.035,105.829],[21.039,105.824],[21.043,105.821],[21.0486,105.8187]]},
+    fast:{name:'Tuyến nhanh nhất',eta:'9 phút',distance:'3,2 km',risk:'Đi qua 1 điểm ngập',color:'#267bd5',coords:[[21.02755,105.83535],[21.034,105.832],[21.040,105.827],[21.044,105.822],[21.0486,105.8187]]},
+    walk:{name:'Tuyến đi bộ',eta:'31 phút',distance:'2,7 km',risk:'Hẻm nhỏ · ít xe',color:'#ef9e1d',coords:[[21.02755,105.83535],[21.030,105.827],[21.037,105.823],[21.042,105.817],[21.0486,105.8187]]}
+  };
+
+  let map, baseLayer, terrainLayer, myMarker, incidentGroup, warningGroup, teamGroup, routeLines={};
+  function pin(type,emoji,live=false){return L.divIcon({className:'',html:`<div class="custom-pin pin-${type}${live?' live':''}"><span>${emoji}</span></div>`,iconSize:[42,42],iconAnchor:[18,39]})}
+  function initMap(){
+    if(typeof L==='undefined'){ $('#map').innerHTML='<div style="height:100%;display:grid;place-items:center;font-weight:800;color:#31545b">Không tải được bản đồ online.<br>Giao diện vẫn có thể kiểm tra.</div>';return }
+    map=L.map('map',{zoomControl:false,attributionControl:true}).setView(me,14);
+    baseLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+    terrainLayer=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'© OpenTopoMap'});
+    myMarker=L.marker(me,{icon:pin('me','●')}).addTo(map).bindTooltip('Vị trí của bạn');
+    incidentGroup=L.layerGroup().addTo(map); warningGroup=L.layerGroup().addTo(map); teamGroup=L.layerGroup().addTo(map);
+    incidents.forEach(x=>L.marker([x.lat,x.lng],{icon:pin('sos','🛟',x.priority==='P1')}).addTo(incidentGroup).on('click',()=>selectIncident(x.id,true)));
+    warnings.forEach(x=>L.marker([x.lat,x.lng],{icon:pin('warn','⚠')}).addTo(warningGroup).bindTooltip(x.label));
+    teams.forEach(x=>L.marker([x.lat,x.lng],{icon:pin('team','✚')}).addTo(teamGroup).bindTooltip(x.label));
+  }
+
+  function toast(title,text){$('#toastTitle').textContent=title;$('#toastText').textContent=text;$('#toast').classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>$('#toast').classList.remove('show'),2800)}
+  function setSheet(level){state.sheet=level;$('#sheet').classList.remove('half','full');if(level==='half')$('#sheet').classList.add('half');if(level==='full')$('#sheet').classList.add('full');document.documentElement.style.setProperty('--sheet-h',level==='min'?'156px':level==='half'?'52vh':'calc(100vh - 16px)');setTimeout(()=>map?.invalidateSize(),360)}
+  $('#sheetMin').onclick=()=>setSheet('min');$('#sheetHalf').onclick=()=>setSheet('half');$('#sheetFull').onclick=()=>setSheet('full');
+  $('#sheetDrag').onclick=e=>{if(e.target.closest('button'))return;setSheet(state.sheet==='min'?'half':state.sheet==='half'?'full':'min')};
+  let sy=0,sh=0;$('#sheetDrag').addEventListener('pointerdown',e=>{sy=e.clientY;sh=$('#sheet').offsetHeight;$('#sheetDrag').setPointerCapture(e.pointerId)});$('#sheetDrag').addEventListener('pointerup',e=>{let d=e.clientY-sy;if(Math.abs(d)<28)return; if(d>0)setSheet(sh>innerHeight*.7?'half':'min');else setSheet(sh<innerHeight*.35?'half':'full')});
+
+  function activateTab(tab){$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));$$('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+tab))}
+  $$('.tab').forEach(b=>b.onclick=()=>activateTab(b.dataset.tab));
+
+  function renderIncidents(){
+    $('#incidentList').innerHTML=incidents.map(x=>`<article class="incident-card" data-id="${x.id}"><div class="incident-top"><div class="incident-icon">🛟</div><div><h3>${x.type} · ${x.people} người</h3><p>${x.name} · ${x.dist} · ${x.time}</p></div><span class="badge ${x.priority.toLowerCase()}">${x.priority}</span></div><p style="margin:9px 1px 0;font-size:12px;color:#49636a">${x.note}</p><div class="card-actions"><button class="small-btn viewIncident">Xem trên bản đồ</button><button class="small-btn primary helpIncident">Hỗ trợ ca này</button></div></article>`).join('');
+    $$('.viewIncident').forEach(b=>b.onclick=()=>selectIncident(b.closest('[data-id]').dataset.id,true));
+    $$('.helpIncident').forEach(b=>b.onclick=()=>acceptIncident(b.closest('[data-id]').dataset.id));
+  }
+  function selectIncident(id,open=false){const x=incidents.find(i=>i.id===id);state.selectedIncident=x;if(map){map.flyTo([x.lat,x.lng],16,{duration:.8})}if(open){setSheet('half');activateTab('nearby')}toast(`SOS ${x.id}`,`${x.type} · ${x.people} người · cập nhật ${x.time}`)}
+  function acceptIncident(id){selectIncident(id);const x=state.selectedIncident;$('#rescueEmpty').style.display='none';$('#rescueActive').style.display='block';$('#rescueActive').innerHTML=`<div class="incident-card"><div class="incident-top"><div class="incident-icon">🛟</div><div><h3>${x.type} · ${x.people} người</h3><p>${x.id} · ${x.name} · pin ${x.battery}% · GPS ±${x.accuracy} m</p></div><span class="badge ${x.priority.toLowerCase()}">${x.priority}</span></div><p style="font-size:12px;color:#49636a">${x.note}</p><div class="card-actions"><button class="small-btn" id="openCompassInline">Mở la bàn</button><button class="small-btn primary" id="goRoutesInline">Chọn tuyến</button></div></div>`;
+    $('#openCompassInline').onclick=openCompass;$('#goRoutesInline').onclick=()=>{activateTab('routes');renderRoutes()};renderRoutes();activateTab('routes');setSheet('half');toast('Đã nhận hỗ trợ',`Đang đề xuất tuyến tới SOS ${x.id}`)
+  }
+  function renderRoutes(){if(!state.selectedIncident)return;$('#routesEmpty').style.display='none';$('#routeList').style.display='block';$('#routeList').innerHTML=`<div class="section-title">Chọn tuyến tiếp cận tốt nhất</div>${Object.entries(routes).map(([id,r])=>`<button class="route-card ${state.selectedRoute===id?'selected':''}" data-route="${id}" style="width:100%;text-align:left"><i class="route-line" style="background:${r.color}"></i><div><h4>${r.name}</h4><p>${r.risk}</p></div><div class="route-metrics"><b>${r.eta}</b><span>${r.distance}</span></div></button>`).join('')}<button class="modal-primary profile-save" id="startNavigationBtn" style="margin-top:4px">Bắt đầu dẫn đường</button>`;
+    $$('.route-card').forEach(b=>b.onclick=()=>selectRoute(b.dataset.route));$('#startNavigationBtn').onclick=startNavigation;drawRoutes();
+  }
+  function drawRoutes(){if(!map)return;Object.values(routeLines).forEach(l=>map.removeLayer(l));routeLines={};Object.entries(routes).forEach(([id,r])=>{routeLines[id]=L.polyline(r.coords,{color:r.color,weight:id===state.selectedRoute?7:4,opacity:(id===state.selectedRoute?0.95:0.45),dashArray:id==='walk'?'8 8':null}).addTo(map);routeLines[id].on('click',()=>selectRoute(id))});map.fitBounds(L.featureGroup(Object.values(routeLines)).getBounds().pad(.2));updateRouteMini()}
+  function selectRoute(id){state.selectedRoute=id;renderRoutes();updateRouteMini();toast(routes[id].name,`${routes[id].eta} · ${routes[id].distance} · ${routes[id].risk}`)}
+  function updateRouteMini(){const r=routes[state.selectedRoute];$('#routeMiniTitle').textContent=`${r.name} · ${r.eta}`;$('#routeMiniSub').textContent=`${r.distance} · ${r.risk}`;$('#routeMiniColor').style.background=r.color;$('#routeMini').classList.toggle('show',!!state.selectedIncident)}
+  $('#routeMiniOpen').onclick=()=>{setSheet('half');activateTab('routes')};
+  function startNavigation(){state.nav=true;state.navIndex=0;setSheet('min');$('#sheetTitle').textContent='Đang dẫn đường cứu hộ';$('#sheetSub').textContent=routes[state.selectedRoute].eta;toast('Đã bắt đầu dẫn đường','La bàn và cảnh báo tuyến đã sẵn sàng.');setTimeout(openCompass,500)}
+
+  function openCompass(){if(!state.selectedIncident){toast('Chưa chọn SOS','Hãy chọn một người đang phát SOS trước.');setSheet('half');return}$('#compassTarget').textContent=`SOS ${state.selectedIncident.id} · ${state.selectedIncident.type}`;$('#compassView').classList.add('show')}
+  $('#compassBtn').onclick=openCompass;$('#compassClose').onclick=()=>$('#compassView').classList.remove('show');$('#compassMapReturn').onclick=()=>$('#compassView').classList.remove('show');$('#compassCall').onclick=()=>toast('Đang mở điện thoại','Chỉ gọi khi người phát SOS đã đồng ý chia sẻ số liên hệ.');
+
+  function openModal(id){closeDrawer();$('#overlay').classList.add('show');$('#'+id).classList.add('show')}
+  function closeModals(){ $('#overlay').classList.remove('show');$$('.modal').forEach(m=>m.classList.remove('show'));closeDrawer() }
+  $$('.modalClose').forEach(b=>b.onclick=closeModals);$('#overlay').onclick=closeModals;
+  function openDrawer(){$('#overlay').classList.add('show');$('#drawer').classList.add('show')}function closeDrawer(){$('#drawer').classList.remove('show');if(!$('.modal.show'))$('#overlay').classList.remove('show')}
+  $('#menuBtn').onclick=openDrawer;$('#drawerClose').onclick=closeDrawer;
+
+  let holdTimer;function holdStart(e){e.preventDefault();if(state.sos){openModal('sosStatusModal');return}$('#sosBtn').classList.add('holding');holdTimer=setTimeout(()=>{ $('#sosBtn').classList.remove('holding');openSosModal()},1200)}function holdEnd(){$('#sosBtn').classList.remove('holding');clearTimeout(holdTimer)}
+  $('#sosBtn').addEventListener('pointerdown',holdStart);['pointerup','pointercancel','pointerleave'].forEach(ev=>$('#sosBtn').addEventListener(ev,holdEnd));
+  function openSosModal(){const p=store.get('profile',{});$('#sosName').value=p.name||'';$('#sosPhone').value=p.phone||'';$('#sosEmail').value=p.email||'';openModal('sosModal')}
+  $$('#sosTypes .type').forEach(b=>b.onclick=()=>{$$('#sosTypes .type').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');state.selectedSosType=b.dataset.type});
+  $('#startSosBtn').onclick=()=>{const profile={name:$('#sosName').value.trim(),phone:$('#sosPhone').value.trim(),email:$('#sosEmail').value.trim()};store.set('profile',profile);updateProfileNudge();state.sos=true;state.sosPoints=1;state.sosCode='AĐ-'+Math.floor(100000+Math.random()*899999);$('#sosLive').classList.add('show');$('#sosBtnText').textContent='SOS đang phát';$('#sosBtn').style.background='linear-gradient(135deg,#9e1626,#d63040)';$('#sosStatusCode').textContent='Mã SOS: '+state.sosCode;$('#statusType').textContent=`${state.selectedSosType} · ${$('#sosPeople').value} người`;closeModals();toast('SOS đã được phát','Foreground Service đang cập nhật vị trí trực tiếp.');if(map){L.marker(me,{icon:pin('sos','SOS',true)}).addTo(map).bindTooltip('SOS của bạn').openTooltip()}clearInterval(state.sosTimer);state.sosTimer=setInterval(()=>{state.sosPoints++;$('#sosLiveMeta').textContent=`Vị trí ${Math.floor(Math.random()*7)+1} giây trước · GPS ±${Math.floor(Math.random()*5)+5} m · Pin 68%`;$('#statusUpdate').textContent=`Đã gửi ${state.sosPoints} điểm vị trí · GPS ±6 m`},5000)};
+  $('#openSosStatus').onclick=()=>openModal('sosStatusModal');$('#call112Btn').onclick=()=>toast('Gọi 112','Bản thật sẽ mở trình gọi điện với số 112.');$('#endSosBtn').onclick=()=>{state.sos=false;clearInterval(state.sosTimer);$('#sosLive').classList.remove('show');$('#sosBtnText').textContent='Giữ để SOS';$('#sosBtn').style.background='';closeModals();toast('Đã kết thúc SOS','Vị trí trực tiếp không còn được chia sẻ.')};
+
+  $('#reportRoadBtn').onclick=()=>openModal('reportModal');$('#photoInput').onchange=e=>{const f=e.target.files[0];if(!f)return;const reader=new FileReader();reader.onload=()=>{$('#photoPreview').src=reader.result;$('#photoBox').classList.add('has');state.photo=reader.result};reader.readAsDataURL(f)};
+  $('#submitReportBtn').onclick=()=>{const type=$('#roadType').value;const sev=$('#roadSeverity').value;closeModals();const p=[me[0]+.0035,me[1]-.0025];if(map)L.marker(p,{icon:pin('warn','⚠')}).addTo(warningGroup).bindTooltip(`${type} · ${sev}`).openTooltip();toast('Đã gửi cảnh báo đường',state.photo?'Ảnh đang được nén và tải lên.':'Báo cáo không có ảnh vẫn được ghi nhận.');state.photo=null;$('#photoBox').classList.remove('has');$('#photoInput').value=''};
+
+  function updateProfileNudge(){const p=store.get('profile',{});$('#profileNudge').classList.toggle('done',!!(p.name||p.phone||p.email));$('#profileName').value=p.name||'';$('#profilePhone').value=p.phone||'';$('#profileEmail').value=p.email||''}
+  $('#profileNudge').onclick=()=>openModal('profileModal');$('#profileMenu').onclick=()=>{updateProfileNudge();openModal('profileModal')};$('#contactMenu').onclick=()=>{updateProfileNudge();openModal('profileModal')};$('#saveProfileBtn').onclick=()=>{store.set('profile',{name:$('#profileName').value.trim(),phone:$('#profilePhone').value.trim(),email:$('#profileEmail').value.trim()});updateProfileNudge();closeModals();toast('Đã lưu trên thiết bị','Thông tin chỉ được chia sẻ khi bạn chủ động phát SOS.')};
+
+  $('#layersBtn').onclick=()=>openModal('layersModal');$$('[data-layer]').forEach(b=>b.onclick=()=>{const key=b.dataset.layer;const layer=key==='sos'?incidentGroup:key==='warn'?warningGroup:teamGroup;if(map.hasLayer(layer)){map.removeLayer(layer);b.querySelector('.arrow').textContent='—'}else{layer.addTo(map);b.querySelector('.arrow').textContent='✓'}});
+  $$('[data-mapstyle]').forEach(b=>b.onclick=()=>{$$('[data-mapstyle]').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');if(!map)return;if(b.dataset.mapstyle==='terrain'){map.removeLayer(baseLayer);terrainLayer.addTo(map)}else{map.removeLayer(terrainLayer);baseLayer.addTo(map)}});
+  $('#locateBtn').onclick=()=>{map?.flyTo(me,16,{duration:.7});toast('Đã về vị trí của bạn','GPS hiện có độ chính xác khoảng ±6 m.')};
+  $('#searchBtn').onclick=()=>{openGeneric('Tìm địa điểm hoặc mã SOS','Nhập mã SOS 6 chữ số để tìm nhanh đúng người đang cần hỗ trợ.',`<div class="field"><label>Tìm kiếm</label><input id="genericSearch" placeholder="Ví dụ: AĐ-742819 hoặc Hoàn Kiếm" autofocus></div><button class="modal-primary profile-save" id="genericSearchBtn">Tìm trên bản đồ</button>`);setTimeout(()=>$('#genericSearchBtn').onclick=()=>{const q=$('#genericSearch').value.toUpperCase();const x=incidents.find(i=>i.id.includes(q.replace('AĐ-',''))||i.id===q);closeModals();if(x)selectIncident(x.id,true);else toast('Đang tìm kiếm','Bản thật sẽ dùng geocoding online hoặc dữ liệu offline.')},0)};
+
+  function openGeneric(title,sub,html){$('#genericTitle').textContent=title;$('#genericSub').textContent=sub;$('#genericBody').innerHTML=html;openModal('genericModal')}
+  $('#permissionMenu').onclick=()=>openGeneric('Quyền và chạy nền','Trạng thái thiết bị hiện tại',`<div class="incident-card"><h3>✓ Vị trí chính xác</h3><p>Chỉ dùng liên tục khi SOS hoặc dẫn đường đang hoạt động.</p></div><div class="incident-card"><h3>✓ Thông báo Foreground Service</h3><p>Giúp SOS tiếp tục cập nhật khi tắt màn hình.</p></div><div class="incident-card"><h3>! Tối ưu pin</h3><p>Bản Android thật sẽ hướng dẫn theo từng hãng điện thoại.</p></div>`);
+  $('#offlineMenu').onclick=()=>openModal('offlineModal');$$('[data-radius]').forEach(b=>b.onclick=()=>{$$('[data-radius]').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');$('#downloadOfflineBtn').textContent='Tải khu vực '+b.textContent.split('·')[0].trim()});$('#downloadOfflineBtn').onclick=()=>{closeModals();toast('Đang tải bản đồ offline','Mô phỏng: 18% · có thể tiếp tục dùng app.')};
+  $('#privacyMenu').onclick=()=>openGeneric('Riêng tư và dữ liệu','Thu thập tối thiểu, minh bạch theo từng hành động',`<div class="privacy-note"><strong>Vị trí trực tiếp không được chia sẻ khi bạn chỉ mở bản đồ.</strong> Nó chỉ được gửi khi SOS hoặc bạn chủ động nhận hỗ trợ và bắt đầu dẫn đường.</div><div class="incident-card"><h3>Dữ liệu lưu trên thiết bị</h3><p>Profile tùy chọn, báo cáo chờ mạng và gói bản đồ offline.</p></div><div class="incident-card"><h3>Dữ liệu gửi khi SOS</h3><p>Tọa độ, thời gian, độ chính xác GPS, pin và thông tin liên hệ bạn đã chọn.</p></div>`);
+  $('#languageMenu').onclick=()=>openModal('languageModal');
+  $$('[data-language]').forEach(b=>b.onclick=()=>{store.set('language',b.dataset.language);store.set('languageConfirmed',true);location.reload()});
+
+  let onboardingLanguage='vi';
+  const languageGate=$('#languageGate');
+  const updateLanguageGate=language=>{
+    onboardingLanguage=language;
+    $$('[data-onboarding-language]').forEach(button=>{
+      const selected=button.dataset.onboardingLanguage===language;
+      button.classList.toggle('selected',selected);
+      button.setAttribute('aria-checked',String(selected));
+    });
+    if(language==='en'){
+      $('#languageBrandSub').textContent='Community SOS Map';
+      $('#languageGateTitle').textContent='Choose your language';
+      $('#languageGateCopy').textContent='Choose a language to continue. Vietnamese is selected by default.';
+      $('#languageContinue').textContent='Continue';
+      $('#languageFootnote').textContent='You can change this later in Menu → Language.';
+    }else{
+      $('#languageBrandSub').textContent='Bản đồ SOS cộng đồng';
+      $('#languageGateTitle').textContent='Chọn ngôn ngữ';
+      $('#languageGateCopy').textContent='Chọn ngôn ngữ để bắt đầu. Tiếng Việt được chọn sẵn.';
+      $('#languageContinue').textContent='Tiếp tục';
+      $('#languageFootnote').textContent='Bạn có thể thay đổi ngôn ngữ sau trong Menu → Ngôn ngữ.';
+    }
+  };
+  $$('[data-onboarding-language]').forEach(button=>button.onclick=()=>updateLanguageGate(button.dataset.onboardingLanguage));
+  $('#languageContinue').onclick=()=>{
+    store.set('language',onboardingLanguage);
+    store.set('languageConfirmed',true);
+    location.reload();
+  };
+  if(needsLanguageChoice){updateLanguageGate('vi');languageGate.classList.add('show')}
+  else languageGate.classList.remove('show');
+  $('#aboutMenu').onclick=()=>openGeneric('An Đồ','Bản đồ SOS cộng đồng',`<div class="incident-card"><h3>Một bản đồ. Hai hành động.</h3><p>Phát SOS để chia sẻ vị trí hoặc chụp ảnh báo đoạn đường nguy hiểm. Ai ở gần cũng có thể chọn hỗ trợ một phiên SOS đang công khai.</p></div><div class="privacy-note">Prototype HTML chỉ mô phỏng trải nghiệm. Ứng dụng thật cần Android Foreground Service, Firebase và engine định tuyến.</div>`);
+  $('#resetMenu').onclick=()=>{localStorage.clear();location.reload()};$('#avoidWarningBtn').onclick=()=>toast('Đã thêm vùng cần tránh','Các tuyến mới sẽ ưu tiên không đi qua điểm ngập này.');
+
+  $('#openSosStatus').onclick=()=>openModal('sosStatusModal');
+  window.addEventListener('online',updateNetwork);window.addEventListener('offline',updateNetwork);function updateNetwork(){const online=navigator.onLine;$('#netStatus').classList.toggle('offline',!online);$('#netStatus').innerHTML=online?'<span>●</span><b>ONLINE</b><span>· GPS ±6 m</span>':'<span>●</span><b>OFFLINE</b><span>· GPS vẫn hoạt động</span>';if(!online)toast('Đã mất Internet','SOS và báo đường sẽ lưu cục bộ để gửi bù khi có mạng.')}
+  const device=store.get('deviceId')||('AĐ-'+Math.random().toString(36).slice(2,8).toUpperCase());store.set('deviceId',device);$('#deviceLabel').textContent='Thiết bị '+device;
+  initI18n();renderIncidents();updateProfileNudge();updateNetwork();initMap();setTimeout(()=>toast('An Đồ đã sẵn sàng','Không cần đăng nhập · vị trí chưa được chia sẻ.'),700);
+})();
+</script>
+</body>
+</html>

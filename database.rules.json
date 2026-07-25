@@ -1,0 +1,21 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "active_sos": {
+      ".read": "auth != null",
+      "$sosId": {
+        ".write": "auth != null && (!data.exists() || data.child('ownerId').val() == auth.uid || newData.child('ownerId').val() == auth.uid)",
+        ".validate": "newData.hasChildren(['id','ownerId','latitude','longitude','active','updatedAt'])"
+      }
+    },
+    "sos_assignments": {
+      "$sosId": {
+        "$helperId": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid == $helperId"
+        }
+      }
+    }
+  }
+}

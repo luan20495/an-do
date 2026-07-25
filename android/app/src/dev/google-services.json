@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "893533751647",
+    "project_id": "fir-integration-4405d",
+    "storage_bucket": "fir-integration-4405d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:893533751647:android:86f3a6f3bd853f14f64eea",
+        "android_client_info": {
+          "package_name": "com.hoangluan.nguyenthachhoangluan.firebase_integration"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAGhrixc7t7moLVGfBDTR-1OqKGN8LUoWI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:893533751647:android:1ec0987093fd2e14f64eea",
+        "android_client_info": {
+          "package_name": "com.hoangluan.safetymap"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAGhrixc7t7moLVGfBDTR-1OqKGN8LUoWI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:893533751647:android:cc19dafbe837e8f6f64eea",
+        "android_client_info": {
+          "package_name": "com.hoangluan.safetymap.dev"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAGhrixc7t7moLVGfBDTR-1OqKGN8LUoWI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

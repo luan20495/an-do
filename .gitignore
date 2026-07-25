@@ -1,0 +1,17 @@
+.dart_tool/
+.packages
+.pub/
+build/
+coverage/
+.idea/
+.vscode/
+*.iml
+android/.gradle/
+android/local.properties
+android/key.properties
+android/app/google-services.json
+*.jks
+*.keystore
+.env
+firebase_options.local.dart
+.DS_Store
