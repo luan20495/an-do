@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chính sách quyền riêng tư — An Đồ</title>
+  <meta name="description" content="Chính sách quyền riêng tư của ứng dụng An Đồ — bản đồ SOS cộng đồng." />
+  <link rel="canonical" href="https://luan20495.github.io/an-do/" />
+  <style>
+    :root {
+      --brand: #087f65;
+      --brand-deep: #065f4c;
+      --danger: #e93b45;
+      --ink: #0c1b22;
+      --muted: #4a6068;
+      --line: #d7e4e0;
+      --surface: #f4f7f6;
+      --card: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 500px at 10% -10%, #d9f3ec 0%, transparent 55%),
+        radial-gradient(900px 400px at 100% 0%, #ffe8ea 0%, transparent 45%),
+        var(--surface);
+      line-height: 1.65;
+    }
+    .wrap {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 28px 20px 64px;
+    }
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 28px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+    }
+    .mark {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: var(--brand);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      letter-spacing: .02em;
+    }
+    .brand h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 900;
+    }
+    .brand p {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+    .lang {
+      display: inline-flex;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      overflow: hidden;
+      background: var(--card);
+    }
+    .lang button {
+      border: 0;
+      background: transparent;
+      padding: 8px 14px;
+      font-weight: 800;
+      cursor: pointer;
+      color: var(--muted);
+    }
+    .lang button[aria-pressed="true"] {
+      background: var(--brand);
+      color: #fff;
+    }
+    article {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 28px 24px;
+      box-shadow: 0 18px 40px rgba(12, 27, 34, .06);
+    }
+    article h2 {
+      margin: 0 0 8px;
+      font-size: 1.75rem;
+      font-weight: 900;
+      letter-spacing: -.02em;
+    }
+    .meta {
+      color: var(--muted);
+      font-size: .92rem;
+      margin-bottom: 22px;
+    }
+    h3 {
+      margin: 26px 0 8px;
+      font-size: 1.1rem;
+      font-weight: 900;
+      color: var(--brand-deep);
+    }
+    p, li { color: #20343b; }
+    ul { padding-left: 1.2rem; margin: 8px 0 0; }
+    li { margin: 6px 0; }
+    .callout {
+      margin: 18px 0;
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: #edf7f4;
+      border: 1px solid #cfe8df;
+      color: #2f5650;
+    }
+    .callout strong { color: var(--brand-deep); }
+    .warn {
+      background: #fff4f4;
+      border-color: #f3c9cc;
+      color: #7a2d34;
+    }
+    .warn strong { color: var(--danger); }
+    footer {
+      margin-top: 22px;
+      color: var(--muted);
+      font-size: .88rem;
+    }
+    a { color: var(--brand-deep); }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <a class="brand" href="./">
+        <div class="mark">AĐ</div>
+        <div>
+          <h1>An Đồ</h1>
+          <p>Biết nguy hiểm. Tìm đường an toàn.</p>
+        </div>
+      </a>
+      <div class="lang" role="group" aria-label="Language">
+        <button type="button" id="btn-vi" aria-pressed="true">VI</button>
+        <button type="button" id="btn-en" aria-pressed="false">EN</button>
+      </div>
+    </header>
+
+    <article id="vi" lang="vi">
+      <h2>Chính sách quyền riêng tư</h2>
+      <p class="meta">Cập nhật lần cuối: 25/07/2026 · Ứng dụng Android An Đồ</p>
+
+      <div class="callout">
+        <strong>Thu thập tối thiểu, theo hành động của bạn.</strong>
+        An Đồ không chia sẻ vị trí khi bạn chỉ mở bản đồ. Vị trí trực tiếp chỉ được gửi khi bạn chủ động phát SOS hoặc nhận hỗ trợ một ca và bắt đầu dẫn đường.
+      </div>
+
+      <h3>1. Chúng tôi là ai</h3>
+      <p>
+        An Đồ là ứng dụng bản đồ SOS cộng đồng giúp người dùng chia sẻ vị trí khi cần hỗ trợ,
+        xem các phiên SOS công khai gần đó, và báo đoạn đường nguy hiểm bằng ảnh.
+      </p>
+
+      <h3>2. Dữ liệu lưu trên thiết bị</h3>
+      <ul>
+        <li>Ngôn ngữ bạn đã chọn.</li>
+        <li>Hồ sơ SOS tùy chọn (tên, số điện thoại, email) — không bắt buộc để mở app hoặc phát SOS.</li>
+        <li>Mã cài đặt ngẫu nhiên (installation ID) dùng khi chưa đăng nhập Firebase.</li>
+        <li>Báo cáo / dữ liệu chờ gửi khi mất mạng.</li>
+      </ul>
+      <p>Hồ sơ trên thiết bị được lưu trong bộ nhớ bảo mật của ứng dụng và chỉ đưa lên máy chủ khi bạn xác nhận phát SOS.</p>
+
+      <h3>3. Dữ liệu gửi khi bạn phát SOS</h3>
+      <ul>
+        <li>Tọa độ, thời gian cập nhật, độ chính xác GPS.</li>
+        <li>Thông tin phiên SOS: loại sự cố, số người cần giúp, mô tả ngắn.</li>
+        <li>Mức pin thiết bị (nếu có).</li>
+        <li>Thông tin liên hệ bạn đã điền (nếu có).</li>
+        <li>Định danh tài khoản ẩn danh Firebase (UID) để phân quyền phiên của bạn.</li>
+      </ul>
+      <p>Trong lúc SOS đang hoạt động, ứng dụng có thể dùng dịch vụ chạy nền (Foreground Service) để cập nhật vị trí ngay cả khi màn hình tắt.</p>
+
+      <h3>4. Báo đoạn đường</h3>
+      <p>
+        Khi bạn báo đường nguy hiểm, ứng dụng có thể gửi loại sự cố, mức độ, ghi chú, tọa độ gần vị trí hiện tại
+        và ảnh bạn chọn. Ảnh được nén trước khi tải lên (giảm kích thước, bỏ metadata không cần thiết khi xử lý được).
+      </p>
+
+      <h3>5. Dữ liệu chúng tôi không thu thập</h3>
+      <ul>
+        <li>Không đọc IMEI, số serial hoặc địa chỉ MAC để định danh bạn.</li>
+        <li>Không theo dõi vị trí nền khi bạn không phát SOS / không dẫn đường hỗ trợ.</li>
+        <li>Không bán dữ liệu cá nhân cho bên thứ ba để quảng cáo.</li>
+      </ul>
+
+      <h3>6. Nhà cung cấp dịch vụ</h3>
+      <p>
+        An Đồ có thể dùng Firebase (Authentication ẩn danh, Realtime Database / Firestore, Storage, Analytics / Crashlytics / App Check)
+        để vận hành SOS, lưu báo cáo và ổn định ứng dụng. Bản đồ và định tuyến có thể dùng dịch vụ bản đồ / định tuyến công cộng
+        (ví dụ ô bản đồ OpenFreeMap và tuyến OSRM) — các yêu cầu mạng tới dịch vụ này tuân theo chính sách của nhà cung cấp tương ứng.
+      </p>
+
+      <h3>7. Lưu trữ và bảo mật</h3>
+      <p>
+        Chúng tôi áp dụng biện pháp hợp lý để bảo vệ dữ liệu (truyền tải HTTPS, quy tắc truy cập phía máy chủ, mã hóa lưu trữ hồ sơ trên thiết bị khi khả dụng).
+        Không hệ thống nào an toàn tuyệt đối; hãy chỉ chia sẻ thông tin bạn chấp nhận công khai trong tình huống khẩn cấp cộng đồng.
+      </p>
+
+      <h3>8. Thời gian lưu</h3>
+      <p>
+        Dữ liệu SOS / báo cáo được giữ trong thời gian cần thiết để hỗ trợ cộng đồng và vận hành dịch vụ,
+        sau đó có thể bị xóa hoặc ẩn danh hóa. Bạn có thể kết thúc phiên SOS bất cứ lúc nào trong ứng dụng để ngừng chia sẻ vị trí trực tiếp.
+      </p>
+
+      <h3>9. Quyền của bạn</h3>
+      <ul>
+        <li>Bỏ trống hồ sơ và vẫn phát SOS.</li>
+        <li>Kết thúc SOS để dừng chia sẻ vị trí trực tiếp.</li>
+        <li>Gỡ cài đặt ứng dụng để xóa dữ liệu cục bộ trên thiết bị.</li>
+        <li>Liên hệ chúng tôi để yêu cầu hỗ trợ liên quan dữ liệu tài khoản / phiên trên máy chủ.</li>
+      </ul>
+
+      <div class="callout warn">
+        <strong>An Đồ không thay thế tổng đài khẩn cấp 112.</strong>
+        Trong tình huống nguy hiểm đến tính mạng, hãy gọi 112 hoặc cơ quan chức năng địa phương. Ứng dụng không bảo đảm sẽ có đội hỗ trợ tiếp nhận ca của bạn.
+      </div>
+
+      <h3>10. Trẻ em</h3>
+      <p>
+        An Đồ không hướng tới trẻ em dưới 13 tuổi. Nếu bạn là phụ huynh và cho rằng trẻ đã cung cấp dữ liệu, hãy liên hệ để chúng tôi hỗ trợ xử lý.
+      </p>
+
+      <h3>11. Thay đổi chính sách</h3>
+      <p>
+        Chúng tôi có thể cập nhật trang này khi sản phẩm thay đổi. Ngày “Cập nhật lần cuối” sẽ được chỉnh tương ứng.
+        Việc tiếp tục sử dụng ứng dụng sau khi cập nhật đồng nghĩa bạn đã biết về thay đổi công bố tại đây.
+      </p>
+
+      <h3>12. Liên hệ</h3>
+      <p>
+        Câu hỏi về quyền riêng tư / dữ liệu: liên hệ qua GitHub
+        <a href="https://github.com/luan20495/an-do/issues">luan20495/an-do</a>
+        hoặc email dự án gắn với tài khoản phát hành ứng dụng trên cửa hàng.
+      </p>
+    </article>
+
+    <article id="en" lang="en" hidden>
+      <h2>Privacy Policy</h2>
+      <p class="meta">Last updated: 25 Jul 2026 · An Đồ Android app</p>
+
+      <div class="callout">
+        <strong>Minimum collection, tied to your actions.</strong>
+        An Đồ does not share location when you only open the map. Live location is sent only when you actively start SOS, or accept a case and begin navigation.
+      </div>
+
+      <h3>1. Who we are</h3>
+      <p>
+        An Đồ is a community SOS map that lets people share location when they need help,
+        browse nearby public SOS sessions, and report hazardous road segments with a photo.
+      </p>
+
+      <h3>2. Data stored on your device</h3>
+      <ul>
+        <li>Your chosen language.</li>
+        <li>Optional SOS profile (name, phone, email) — not required to open the app or send SOS.</li>
+        <li>A random installation ID used when Firebase auth is unavailable.</li>
+        <li>Queued reports / offline payloads while the network is down.</li>
+      </ul>
+      <p>On-device profile data is kept in the app’s secure storage and is uploaded only when you confirm sending SOS.</p>
+
+      <h3>3. Data sent when you start SOS</h3>
+      <ul>
+        <li>Coordinates, update time, GPS accuracy.</li>
+        <li>SOS session details: hazard type, people needing help, short description.</li>
+        <li>Device battery level (when available).</li>
+        <li>Contact details you entered (if any).</li>
+        <li>Anonymous Firebase UID used to authorize your session.</li>
+      </ul>
+      <p>While SOS is active, the app may use a foreground service to keep updating location even when the screen is off.</p>
+
+      <h3>4. Road hazard reports</h3>
+      <p>
+        When you report a dangerous road segment, the app may send the hazard type, severity, note,
+        approximate coordinates near your current position, and a photo you choose.
+        Photos are compressed before upload (smaller size; unnecessary metadata stripped when processing allows).
+      </p>
+
+      <h3>5. Data we do not collect</h3>
+      <ul>
+        <li>We do not read IMEI, serial numbers, or MAC addresses to identify you.</li>
+        <li>We do not track background location when you are not in SOS / helper navigation.</li>
+        <li>We do not sell personal data to third parties for advertising.</li>
+      </ul>
+
+      <h3>6. Service providers</h3>
+      <p>
+        An Đồ may use Firebase (Anonymous Auth, Realtime Database / Firestore, Storage, Analytics / Crashlytics / App Check)
+        to operate SOS, store reports, and keep the app reliable. Maps and routing may use public map/routing services
+        (for example OpenFreeMap tiles and OSRM routes). Network requests to those services follow their own policies.
+      </p>
+
+      <h3>7. Retention and security</h3>
+      <p>
+        We apply reasonable safeguards (HTTPS, server-side access rules, encrypted on-device profile storage when available).
+        No system is perfectly secure; only share information you accept making public in a community emergency context.
+      </p>
+
+      <h3>8. How long we keep data</h3>
+      <p>
+        SOS / report data is kept as long as needed to support the community service, then may be deleted or anonymized.
+        You can end an SOS session in the app at any time to stop live location sharing.
+      </p>
+
+      <h3>9. Your choices</h3>
+      <ul>
+        <li>Leave the profile empty and still send SOS.</li>
+        <li>End SOS to stop live location sharing.</li>
+        <li>Uninstall the app to remove local data on the device.</li>
+        <li>Contact us for help related to account / session data on our servers.</li>
+      </ul>
+
+      <div class="callout warn">
+        <strong>An Đồ does not replace emergency number 112.</strong>
+        In life-threatening situations, call 112 or local authorities. The app does not guarantee that helpers will accept your case.
+      </div>
+
+      <h3>10. Children</h3>
+      <p>
+        An Đồ is not directed at children under 13. If you are a parent and believe a child provided data, contact us for assistance.
+      </p>
+
+      <h3>11. Changes</h3>
+      <p>
+        We may update this page as the product changes. The “Last updated” date will change accordingly.
+        Continued use of the app after an update means you are aware of the changes published here.
+      </p>
+
+      <h3>12. Contact</h3>
+      <p>
+        Privacy questions: open an issue on
+        <a href="https://github.com/luan20495/an-do/issues">luan20495/an-do</a>
+        or use the contact email associated with the store listing publisher account.
+      </p>
+    </article>
+
+    <footer>
+      <span data-i18n-vi>Trang này được dùng cho Google Play / đánh giá cửa hàng.</span>
+      <span data-i18n-en hidden>This page is intended for Google Play / store review.</span>
+      · <a href="https://github.com/luan20495/an-do">GitHub</a>
+    </footer>
+  </div>
+
+  <script>
+    const vi = document.getElementById('vi');
+    const en = document.getElementById('en');
+    const btnVi = document.getElementById('btn-vi');
+    const btnEn = document.getElementById('btn-en');
+    const footVi = document.querySelector('[data-i18n-vi]');
+    const footEn = document.querySelector('[data-i18n-en]');
+
+    function setLang(lang) {
+      const isVi = lang === 'vi';
+      vi.hidden = !isVi;
+      en.hidden = isVi;
+      btnVi.setAttribute('aria-pressed', String(isVi));
+      btnEn.setAttribute('aria-pressed', String(!isVi));
+      document.documentElement.lang = lang;
+      document.title = isVi
+        ? 'Chính sách quyền riêng tư — An Đồ'
+        : 'Privacy Policy — An Đồ';
+      footVi.hidden = !isVi;
+      footEn.hidden = isVi;
+      try { localStorage.setItem('an-do-privacy-lang', lang); } catch (_) {}
+    }
+
+    btnVi.addEventListener('click', () => setLang('vi'));
+    btnEn.addEventListener('click', () => setLang('en'));
+
+    let initial = 'vi';
+    try {
+      const saved = localStorage.getItem('an-do-privacy-lang');
+      if (saved === 'en' || saved === 'vi') initial = saved;
+      else if (navigator.language && navigator.language.toLowerCase().startsWith('en')) initial = 'en';
+    } catch (_) {}
+    setLang(initial);
+  </script>
+</body>
+</html>

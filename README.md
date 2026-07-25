@@ -94,6 +94,11 @@ AAB production nằm trong `build/app/outputs/bundle/productionRelease/`.
 
 ## Quyền riêng tư
 
+Chính sách đầy đủ (VI/EN) trên GitHub Pages:
+
+**https://luan20495.github.io/an-do/**
+
+Tóm tắt trong app:
 - Không đọc IMEI, serial hoặc MAC.
 - Installation ID được tạo ngẫu nhiên và lưu local; Firebase UID dùng phân quyền.
 - Không chia sẻ vị trí người dùng bình thường.
