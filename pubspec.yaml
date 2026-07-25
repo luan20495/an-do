@@ -1,7 +1,7 @@
 name: an_do
 publish_to: none
 description: An Đồ - bản đồ SOS cộng đồng, Android-first.
-version: 1.0.1+2
+version: 1.0.2+3
 
 environment:
   sdk: '>=3.7.0 <4.0.0'
@@ -41,6 +41,8 @@ dependencies:
   firebase_app_check: ^0.4.0+1
   firebase_analytics: ^12.0.1
   package_info_plus: ^10.0.0
+  record: ^6.0.0
+  audioplayers: ^6.4.0
 
 dev_dependencies:
   flutter_test:

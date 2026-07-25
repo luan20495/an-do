@@ -9,7 +9,7 @@ class OsrmClient {
   OsrmClient({
     http.Client? client,
     this.baseUrl = 'https://router.project-osrm.org',
-    this.allowDemoFallback = true,
+    this.allowDemoFallback = false,
   }) : _client = client ?? http.Client();
 
   final http.Client _client;
@@ -57,7 +57,7 @@ class OsrmClient {
         );
       }).toList();
     } catch (_) {
-      if (!allowDemoFallback) rethrow;
+      if (!allowDemoFallback) return const [];
       return demoFallbackRoutes(from: from, to: to);
     }
   }

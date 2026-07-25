@@ -2,15 +2,15 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:an_do/core/device/device_identity.dart';
-import 'package:an_do/core/firebase/an_do_firebase.dart';
 import 'package:an_do/core/i18n/app_language_controller.dart';
 import 'package:an_do/core/i18n/strings.dart';
 import 'package:an_do/core/location/sos_foreground_service.dart';
 import 'package:an_do/core/routing/osrm_client.dart';
 import 'package:an_do/core/routing/route_models.dart';
-import 'package:an_do/core/theme/app_theme.dart';
 import 'package:an_do/features/compass/presentation/compass_page.dart';
+import 'package:an_do/features/map/data/map_marker_layers.dart';
 import 'package:an_do/features/map/presentation/menu_drawer.dart';
+import 'package:an_do/features/map/presentation/widgets/active_sos_banner.dart';
 import 'package:an_do/features/map/presentation/widgets/map_overlay_controls.dart';
 import 'package:an_do/features/map/presentation/widgets/map_search_sheet.dart';
 import 'package:an_do/features/report/data/road_hazard_repository.dart';
@@ -22,8 +22,11 @@ import 'package:an_do/features/sos/data/sos_repository.dart';
 import 'package:an_do/features/sos/domain/sos_models.dart';
 import 'package:an_do/features/sos/presentation/profile_form.dart';
 import 'package:an_do/features/sos/presentation/sos_form.dart';
+import 'package:an_do/features/sos_chat/data/sos_chat_repository.dart';
+import 'package:an_do/features/sos_chat/domain/chat_models.dart';
+import 'package:an_do/features/sos_chat/presentation/helper_picker_sheet.dart';
+import 'package:an_do/features/sos_chat/presentation/sos_chat_thread_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
@@ -47,20 +50,23 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   /// Used when GPS is unavailable so demo rescue routes still work.
-  static const _demoOrigin = LatLng(21.0285, 105.8542);
+  
 
   late final SosRepository _sosRepository;
+  late final SosChatRepository _chatRepository;
   late final RoadHazardRepository? _hazardRepository;
   final ProfileStore _profileStore = ProfileStore();
   final RoadReportRepository _reportRepository = RoadReportRepository();
   final OsrmClient _routing = OsrmClient();
-  final Map<String, SosSession> _symbolSessions = {};
-  final Map<String, SosSession> _circleSessions = {};
-  final Map<String, RoadHazard> _circleHazards = {};
-  final Map<String, RoadHazard> _symbolHazards = {};
+  final Set<String> _acceptedSosIds = {};
+  MapMarkerLayers? _markerLayers;
 
   StreamSubscription<List<SosSession>>? _sosSubscription;
   StreamSubscription<List<RoadHazard>>? _hazardSubscription;
+  StreamSubscription<int>? _helperSubscription;
+  StreamSubscription<List<String>>? _helperIdsSubscription;
+  StreamSubscription<int>? _ownerUnreadSubscription;
+  StreamSubscription<ChatThreadMeta>? _selectedThreadMetaSubscription;
   MapLibreMapController? _mapController;
   Position? _position;
   List<SosSession> _sessions = const [];
@@ -69,26 +75,58 @@ class _MapScreenState extends State<MapScreen> {
   SosSession? _selectedSession;
   RoadHazard? _selectedHazard;
   SosSession? _mySession;
+  List<String> _helperIds = const [];
+  int _helperCount = 0;
+  int _announcedHelperCount = 0;
+  int _ownerUnreadTotal = 0;
+  int _selectedThreadUnread = 0;
   bool _loadingRoutes = false;
   bool _styleReady = false;
   bool _didFitOverview = false;
+  int _overlayGeneration = 0;
+  bool _overlayBusy = false;
+  bool _overlayDirty = false;
+  bool _modalOpen = false;
+  final GlobalKey _mapKey = GlobalKey();
+  final ValueNotifier<int> _helperCountListenable = ValueNotifier(0);
+  final ValueNotifier<int> _ownerUnreadListenable = ValueNotifier(0);
+  final ValueNotifier<List<String>> _helperIdsListenable =
+      ValueNotifier(const []);
 
   @override
   void initState() {
     super.initState();
     _sosRepository = createSosRepository(firebaseReady: widget.firebaseReady);
-    // Road hazards stay local until Firestore sync ships; still useful on Firebase builds.
-    _hazardRepository = DemoRoadHazardRepository();
-    _sosSubscription = _sosRepository.watchActive().listen((sessions) {
-      if (!mounted) return;
-      setState(() => _sessions = sessions);
-      unawaited(_renderMapOverlays());
-    });
-    _hazardSubscription = _hazardRepository?.watch().listen((hazards) {
-      if (!mounted) return;
-      setState(() => _hazards = hazards);
-      unawaited(_renderMapOverlays());
-    });
+    _chatRepository = createSosChatRepository(firebaseReady: widget.firebaseReady);
+    // Hazards: only user-reported (no seed). Cloud sync can replace later.
+    _hazardRepository = LocalRoadHazardRepository();
+    _sosSubscription = _sosRepository.watchActive().listen(
+      (sessions) {
+        if (!mounted) return;
+        _sessions = sessions;
+        // Refresh selected card data without rebuilding the whole map tree
+        // unless the open sheet must update.
+        final selected = _selectedSession;
+        if (selected != null) {
+          for (final s in sessions) {
+            if (s.id == selected.id && !identical(s, selected)) {
+              setState(() => _selectedSession = s);
+              break;
+            }
+          }
+        }
+        _scheduleMapOverlays();
+      },
+      onError: (Object error) => debugPrint('SOS stream error: $error'),
+    );
+    _hazardSubscription = _hazardRepository?.watch().listen(
+      (hazards) {
+        if (!mounted) return;
+        _hazards = hazards;
+        _scheduleMapOverlays();
+      },
+      onError: (Object error) => debugPrint('Hazard stream error: $error'),
+    );
     unawaited(_prepareLocation(moveCamera: false));
   }
 
@@ -96,11 +134,28 @@ class _MapScreenState extends State<MapScreen> {
   void dispose() {
     _sosSubscription?.cancel();
     _hazardSubscription?.cancel();
+    _helperSubscription?.cancel();
+    _helperIdsSubscription?.cancel();
+    _ownerUnreadSubscription?.cancel();
+    _selectedThreadMetaSubscription?.cancel();
+    _helperCountListenable.dispose();
+    _ownerUnreadListenable.dispose();
+    _helperIdsListenable.dispose();
     super.dispose();
   }
 
-  LatLng get _origin => _position == null
-      ? _demoOrigin
+  Future<String> _viewerId() async {
+    if (widget.firebaseReady) {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null && uid.isNotEmpty) return uid;
+      // Soft fallback — never crash on null Auth during flaky network.
+      return DeviceIdentity.getOrCreate();
+    }
+    return DeviceIdentity.getOrCreate();
+  }
+
+  LatLng? get _originOrNull => _position == null
+      ? null
       : LatLng(_position!.latitude, _position!.longitude);
 
   Future<bool> _ensureLocationPermission() async {
@@ -192,85 +247,59 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  /// Debounced GeoJSON marker sync — never N× addCircle on the UI isolate.
+  void _scheduleMapOverlays() {
+    if (_modalOpen) {
+      _overlayDirty = true;
+      return;
+    }
+    _overlayDirty = true;
+    if (_overlayBusy) return;
+    unawaited(_drainMapOverlays());
+  }
+
+  Future<void> _drainMapOverlays() async {
+    if (_overlayBusy || _modalOpen) return;
+    _overlayBusy = true;
+    try {
+      while (_overlayDirty && mounted && !_modalOpen) {
+        _overlayDirty = false;
+        final gen = ++_overlayGeneration;
+        await Future<void>.delayed(const Duration(milliseconds: 220));
+        if (!mounted || gen != _overlayGeneration || _modalOpen) continue;
+        await _renderMapOverlays();
+        // Give the input queue a chance to drain after MapLibre work.
+        await Future<void>.delayed(const Duration(milliseconds: 16));
+      }
+    } finally {
+      _overlayBusy = false;
+      if (_overlayDirty && mounted && !_modalOpen) {
+        unawaited(_drainMapOverlays());
+      }
+    }
+  }
+
   Future<void> _renderMapOverlays() async {
     final controller = _mapController;
-    if (controller == null || !_styleReady) return;
-
+    if (controller == null || !_styleReady || !mounted) return;
+    final layers = _markerLayers ??= MapMarkerLayers(controller);
     try {
-      await controller.clearSymbols();
-      await controller.clearCircles();
-      _symbolSessions.clear();
-      _circleSessions.clear();
-      _circleHazards.clear();
-      _symbolHazards.clear();
-
-      final points = <LatLng>[];
-
-      for (final session in _sessions) {
-        final point = LatLng(session.latitude, session.longitude);
-        points.add(point);
-        final selected = _selectedSession?.id == session.id;
-        final circle = await controller.addCircle(
-          CircleOptions(
-            geometry: point,
-            circleRadius: selected ? 16 : 11,
-            circleColor: selected ? '#9F1239' : '#E11D48',
-            circleOpacity: 0.92,
-            circleStrokeWidth: selected ? 4 : 3,
-            circleStrokeColor: '#FFFFFF',
-          ),
-        );
-        _circleSessions[circle.id] = session;
-        final symbol = await controller.addSymbol(
-          SymbolOptions(
-            geometry: point,
-            textField: 'SOS ${session.id}',
-            textSize: selected ? 14 : 12,
-            textColor: '#9F1239',
-            textHaloColor: '#FFFFFF',
-            textHaloWidth: 1.6,
-            textOffset: const Offset(0, 1.9),
-            textAnchor: 'top',
-          ),
-        );
-        _symbolSessions[symbol.id] = session;
-      }
-
-      for (final hazard in _hazards) {
-        final point = LatLng(hazard.latitude, hazard.longitude);
-        points.add(point);
-        final selected = _selectedHazard?.id == hazard.id;
-        final circle = await controller.addCircle(
-          CircleOptions(
-            geometry: point,
-            circleRadius: selected ? 14 : 12,
-            circleColor: selected ? '#B45309' : '#D97706',
-            circleOpacity: 0.95,
-            circleStrokeWidth: selected ? 4 : 3,
-            circleStrokeColor: '#FFFFFF',
-          ),
-        );
-        _circleHazards[circle.id] = hazard;
-        final symbol = await controller.addSymbol(
-          SymbolOptions(
-            geometry: point,
-            textField: hazard.label,
-            textSize: selected ? 13 : 11,
-            textColor: '#92400E',
-            textHaloColor: '#FFFFFF',
-            textHaloWidth: 1.4,
-            textOffset: const Offset(0, 1.7),
-            textAnchor: 'top',
-          ),
-        );
-        _symbolHazards[symbol.id] = hazard;
-      }
-
+      await layers.sync(
+        sessions: _sessions,
+        hazards: _hazards,
+        selectedSosId: _selectedSession?.id,
+        selectedHazardId: _selectedHazard?.id,
+      );
       if (!_didFitOverview &&
           _selectedSession == null &&
           _selectedHazard == null &&
-          points.length >= 2) {
+          _mySession == null &&
+          _sessions.length + _hazards.length >= 2) {
         _didFitOverview = true;
+        final points = <LatLng>[
+          ..._sessions.take(25).map((s) => LatLng(s.latitude, s.longitude)),
+          ..._hazards.take(25).map((h) => LatLng(h.latitude, h.longitude)),
+        ];
         await _fitToPoints(points);
       }
     } catch (error) {
@@ -295,7 +324,7 @@ class _MapScreenState extends State<MapScreen> {
 
     final latPad = ((maxLat - minLat).abs() * 0.25).clamp(0.01, 0.05);
     final lngPad = ((maxLng - minLng).abs() * 0.25).clamp(0.01, 0.05);
-    await controller.animateCamera(
+    await controller.moveCamera(
       CameraUpdate.newLatLngBounds(
         LatLngBounds(
           southwest: LatLng(minLat - latPad, minLng - lngPad),
@@ -310,14 +339,18 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _clearSelection() async {
+    _watchSelectedThreadMeta(null);
     setState(() {
       _selectedSession = null;
       _selectedHazard = null;
       _routes = const [];
       _loadingRoutes = false;
+      _selectedThreadUnread = 0;
     });
-    await _mapController?.clearLines();
-    await _renderMapOverlays();
+    try {
+      await _mapController?.clearLines();
+    } catch (_) {}
+    _scheduleMapOverlays();
   }
 
   Future<void> _selectHazard(RoadHazard hazard) async {
@@ -327,37 +360,54 @@ class _MapScreenState extends State<MapScreen> {
       _routes = const [];
       _loadingRoutes = false;
     });
-    await _mapController?.clearLines();
-    await _renderMapOverlays();
-    await _mapController?.animateCamera(
-      CameraUpdate.newLatLngZoom(
-        LatLng(hazard.latitude, hazard.longitude),
-        15,
-      ),
-    );
+    try {
+      await _mapController?.clearLines();
+    } catch (_) {}
+    _scheduleMapOverlays();
+    try {
+      await _mapController?.moveCamera(
+        CameraUpdate.newLatLngZoom(
+          LatLng(hazard.latitude, hazard.longitude),
+          15,
+        ),
+      );
+    } catch (_) {}
   }
 
   Future<void> _selectSession(SosSession session) async {
+    final isOwn = _mySession?.id == session.id;
     setState(() {
       _selectedSession = session;
       _selectedHazard = null;
       _routes = const [];
-      _loadingRoutes = true;
+      _loadingRoutes = !isOwn;
     });
-    await _renderMapOverlays();
-    await _mapController?.animateCamera(
-      CameraUpdate.newLatLngZoom(
-        LatLng(session.latitude, session.longitude),
-        14.5,
-      ),
-    );
-
-    final from = _origin;
+    if (!isOwn) _watchSelectedThreadMeta(session);
+    _scheduleMapOverlays();
     try {
-      final routes = await _routing.routes(
-        from: from,
-        to: LatLng(session.latitude, session.longitude),
+      await _mapController?.moveCamera(
+        CameraUpdate.newLatLngZoom(
+          LatLng(session.latitude, session.longitude),
+          14.5,
+        ),
       );
+    } catch (_) {}
+
+    // Own SOS: never hit OSRM / draw routes (ANR hotspot during active SOS).
+    if (isOwn) return;
+
+    final from = _originOrNull;
+    if (from == null) {
+      if (mounted) setState(() => _loadingRoutes = false);
+      return;
+    }
+    try {
+      final routes = await _routing
+          .routes(
+            from: from,
+            to: LatLng(session.latitude, session.longitude),
+          )
+          .timeout(const Duration(seconds: 6));
       if (!mounted) return;
       if (_selectedSession?.id != session.id) return;
       setState(() {
@@ -368,7 +418,6 @@ class _MapScreenState extends State<MapScreen> {
     } catch (_) {
       if (!mounted || _selectedSession?.id != session.id) return;
       setState(() => _loadingRoutes = false);
-      _showMessage('Không thể tải tuyến đường lúc này.');
     }
   }
 
@@ -387,85 +436,295 @@ class _MapScreenState extends State<MapScreen> {
     );
 
     final midpoint = route.points[route.points.length ~/ 2];
-    await controller.animateCamera(
+    await controller.moveCamera(
       CameraUpdate.newLatLngZoom(midpoint, 13.5),
     );
   }
 
   Future<void> _startSos() async {
-    final profile = await _profileStore.read();
-    if (!mounted) return;
+    try {
+      final profile = await _profileStore.read();
+      if (!mounted) return;
 
-    final draft = await showModalBottomSheet<SosDraft>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      builder: (_) => SosForm(initialProfile: profile),
-    );
-    if (draft == null) return;
+      _modalOpen = true;
+      final SosDraft? draft;
+      try {
+        draft = await showModalBottomSheet<SosDraft>(
+          context: context,
+          useSafeArea: true,
+          isScrollControlled: true,
+          builder: (_) => SosForm(initialProfile: profile),
+        );
+      } finally {
+        _modalOpen = false;
+      }
+      if (draft == null) return;
 
-    await _prepareLocation();
-    final position = _position;
-    final latLng = position == null && !widget.firebaseReady
-        ? _demoOrigin
-        : position == null
-            ? null
-            : LatLng(position.latitude, position.longitude);
-    if (latLng == null) return;
+      await _prepareLocation();
+      final position = _position;
+      if (position == null) {
+        if (mounted) {
+          _showMessage('Chưa lấy được vị trí GPS thật. Bật GPS rồi thử lại.');
+        }
+        return;
+      }
+      final latLng = LatLng(position.latitude, position.longitude);
 
-    final ownerId = widget.firebaseReady
-        ? FirebaseAuth.instance.currentUser!.uid
-        : await DeviceIdentity.getOrCreate();
-    final session = SosSession(
-      id: const Uuid().v4().substring(0, 8).toUpperCase(),
-      ownerId: ownerId,
-      latitude: latLng.latitude,
-      longitude: latLng.longitude,
-      accuracyMeters: position?.accuracy ?? 15,
-      updatedAt: DateTime.now(),
-      type: draft.type,
-      peopleCount: draft.peopleCount,
-      description: draft.description,
-      profile: draft.profile,
-    );
+      final ownerId = widget.firebaseReady
+          ? FirebaseAuth.instance.currentUser?.uid
+          : await DeviceIdentity.getOrCreate();
+      if (ownerId == null || ownerId.isEmpty) {
+        if (mounted) {
+          _showMessage('Chưa sẵn sàng đăng nhập. Thử lại sau vài giây.');
+        }
+        return;
+      }
+      final session = SosSession(
+        id: const Uuid().v4().substring(0, 8).toUpperCase(),
+        ownerId: ownerId,
+        latitude: latLng.latitude,
+        longitude: latLng.longitude,
+        accuracyMeters: position?.accuracy ?? 15,
+        updatedAt: DateTime.now(),
+        type: draft.type,
+        peopleCount: draft.peopleCount,
+        description: draft.description,
+        profile: draft.profile,
+      );
 
-    await _profileStore.save(draft.profile);
-    await _sosRepository.upsert(session);
-    await SosForegroundService.start(
-      sosId: session.id,
-      firebaseEnabled: widget.firebaseReady,
-    );
+      await _profileStore.save(draft.profile);
+      await _sosRepository.upsert(session);
+      try {
+        await SosForegroundService.start(
+          sosId: session.id,
+          firebaseEnabled: widget.firebaseReady,
+        ).timeout(const Duration(seconds: 8));
+      } catch (error) {
+        debugPrint('SOS FGS start soft-failed: $error');
+      }
 
-    if (!mounted) return;
-    setState(() {
-      _mySession = session;
-      _selectedSession = session;
+      if (!mounted) return;
+      // Keep map quiet: banner only — no detail sheet / route fetch while SOS is live.
+      setState(() {
+        _mySession = session;
+        _selectedSession = null;
+        _selectedHazard = null;
+        _routes = const [];
+        _loadingRoutes = false;
+        _helperCount = 0;
+        _helperIds = const [];
+        _announcedHelperCount = 0;
+        _ownerUnreadTotal = 0;
+      });
+      _helperCountListenable.value = 0;
+      _helperIdsListenable.value = const [];
+      _ownerUnreadListenable.value = 0;
+      _listenForHelpers(session.id);
+      _listenOwnerUnread(session.id);
+      // One light marker refresh after SOS appears in the stream.
+      _markerLayers?.invalidate();
+      _scheduleMapOverlays();
+    } catch (error, stack) {
+      debugPrint('SOS start failed: $error\n$stack');
+      if (mounted) {
+        _showMessage('Không thể tạo SOS lúc này. Thử lại.');
+      }
+    }
+  }
+
+  void _listenOwnerUnread(String sosId) {
+    unawaited(_ownerUnreadSubscription?.cancel());
+    _ownerUnreadSubscription =
+        _chatRepository.watchOwnerUnreadTotal(sosId).listen((total) {
+      if (!mounted || _mySession?.id != sosId) return;
+      _ownerUnreadTotal = total;
+      _ownerUnreadListenable.value = total;
     });
+  }
+
+  void _listenForHelpers(String sosId) {
+    unawaited(_helperSubscription?.cancel());
+    unawaited(_helperIdsSubscription?.cancel());
+    _helperSubscription = _sosRepository.watchHelperCount(sosId).listen(
+      (count) {
+        if (!mounted || _mySession?.id != sosId) return;
+        final previous = _helperCount;
+        _helperCount = count;
+        _helperCountListenable.value = count;
+        unawaited(SosForegroundService.updateHelperCount(count));
+        if (count > previous && count > _announcedHelperCount) {
+          _announcedHelperCount = count;
+          final strings = S(context);
+          _showMessage(strings.helperJoined(count));
+        }
+      },
+      onError: (Object error) => debugPrint('Helper count stream: $error'),
+    );
+    _helperIdsSubscription = _sosRepository.watchHelperIds(sosId).listen(
+      (ids) {
+        if (!mounted || _mySession?.id != sosId) return;
+        _helperIds = ids;
+        _helperIdsListenable.value = ids;
+      },
+      onError: (Object error) => debugPrint('Helper ids stream: $error'),
+    );
   }
 
   Future<void> _finishSos() async {
     final session = _mySession;
     if (session == null) return;
 
-    await _sosRepository.finish(session.id);
-    await SosForegroundService.stop();
+    try {
+      await _helperSubscription?.cancel();
+      _helperSubscription = null;
+      await _helperIdsSubscription?.cancel();
+      _helperIdsSubscription = null;
+      await _ownerUnreadSubscription?.cancel();
+      _ownerUnreadSubscription = null;
+      await _sosRepository.finish(session.id);
+      try {
+        await SosForegroundService.stop().timeout(const Duration(seconds: 5));
+      } catch (_) {}
+      if (!mounted) return;
+      setState(() {
+        _mySession = null;
+        _selectedSession = null;
+        _helperCount = 0;
+        _helperIds = const [];
+        _announcedHelperCount = 0;
+        _ownerUnreadTotal = 0;
+        _routes = const [];
+      });
+      _helperCountListenable.value = 0;
+      _helperIdsListenable.value = const [];
+      _ownerUnreadListenable.value = 0;
+      try {
+        await _mapController?.clearLines();
+      } catch (_) {}
+      _scheduleMapOverlays();
+    } catch (error, stack) {
+      debugPrint('SOS finish failed: $error\n$stack');
+      if (mounted) _showMessage('Không thể kết thúc SOS. Thử lại.');
+    }
+  }
+
+  Future<void> _openOwnerChatPicker() async {
+    final session = _mySession;
+    if (session == null) return;
+    final helpers = List<String>.from(_helperIdsListenable.value);
+    if (helpers.isEmpty) return;
+
+    Future<void> open(String helperId) async {
+      if (!mounted) return;
+      final strings = S(context);
+      final short = helperId.length > 8
+          ? '${helperId.substring(0, 8)}…'
+          : helperId;
+      await _openChatThread(
+        sosId: session.id,
+        helperId: helperId,
+        ownerId: session.ownerId,
+        viewerId: session.ownerId,
+        peerLabel: '${strings.helperLabel} $short',
+      );
+    }
+
+    // Single helper: open chat immediately (common path + avoids sheet tap miss).
+    if (helpers.length == 1) {
+      await open(helpers.first);
+      return;
+    }
+
+    _modalOpen = true;
+    String? helperId;
+    try {
+      helperId = await showHelperPickerSheet(
+        context: context,
+        sosId: session.id,
+        ownerId: session.ownerId,
+        helperIds: helpers,
+        chatRepository: _chatRepository,
+      );
+    } finally {
+      _modalOpen = false;
+      _scheduleMapOverlays();
+    }
+    if (helperId == null || !mounted) return;
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    await open(helperId);
+  }
+
+  Future<void> _openVictimChat(SosSession session) async {
+    final helperId = await _viewerId()
+        .timeout(const Duration(seconds: 2), onTimeout: () => 'local-helper');
     if (!mounted) return;
-    setState(() {
-      _mySession = null;
-      _selectedSession = null;
-      _routes = const [];
-    });
-    await _mapController?.clearLines();
+    final strings = S(context);
+    final name = session.profile.name.trim();
+    await _openChatThread(
+      sosId: session.id,
+      helperId: helperId,
+      ownerId: session.ownerId,
+      viewerId: helperId,
+      peerLabel: name.isEmpty ? strings.victimLabel : name,
+    );
+  }
+
+  Future<void> _openChatThread({
+    required String sosId,
+    required String helperId,
+    required String ownerId,
+    required String viewerId,
+    required String peerLabel,
+  }) async {
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SosChatThreadPage(
+          sosId: sosId,
+          helperId: helperId,
+          ownerId: ownerId,
+          viewerId: viewerId,
+          peerLabel: peerLabel,
+          chatRepository: _chatRepository,
+        ),
+      ),
+    );
+  }
+
+  void _watchSelectedThreadMeta(SosSession? session) {
+    unawaited(_selectedThreadMetaSubscription?.cancel());
+    _selectedThreadMetaSubscription = null;
+    if (session == null || _mySession?.id == session.id) {
+      setState(() => _selectedThreadUnread = 0);
+      return;
+    }
+    unawaited(() async {
+      final helperId = await _viewerId();
+      if (!mounted) return;
+      _selectedThreadMetaSubscription = _chatRepository
+          .watchThreadMeta(sosId: session.id, helperId: helperId)
+          .listen((meta) {
+        if (!mounted) return;
+        setState(() {
+          _selectedThreadUnread = meta.unreadFor(
+            viewerId: helperId,
+            ownerId: session.ownerId,
+          );
+        });
+      });
+    }());
   }
 
   Future<void> _reportRoad() async {
     await _prepareLocation();
-    final latLng = _position == null && !widget.firebaseReady
-        ? _demoOrigin
-        : _position == null
-            ? null
-            : LatLng(_position!.latitude, _position!.longitude);
-    if (latLng == null || !mounted) return;
+    final position = _position;
+    if (position == null || !mounted) {
+      if (mounted) {
+        _showMessage('Chưa lấy được vị trí GPS thật. Bật GPS rồi thử lại.');
+      }
+      return;
+    }
+    final latLng = LatLng(position.latitude, position.longitude);
 
     final draft = await showModalBottomSheet<ReportDraft>(
       context: context,
@@ -476,8 +735,12 @@ class _MapScreenState extends State<MapScreen> {
     if (draft == null) return;
 
     final ownerId = widget.firebaseReady
-        ? FirebaseAuth.instance.currentUser!.uid
+        ? FirebaseAuth.instance.currentUser?.uid
         : await DeviceIdentity.getOrCreate();
+    if (ownerId == null || ownerId.isEmpty) {
+      if (mounted) _showMessage('Chưa sẵn sàng. Thử lại sau.');
+      return;
+    }
     final report = RoadReport(
       id: const Uuid().v4(),
       ownerId: ownerId,
@@ -511,25 +774,30 @@ class _MapScreenState extends State<MapScreen> {
     _showMessage(
       widget.firebaseReady
           ? 'Đã gửi cảnh báo đoạn đường.'
-          : 'Đã lưu báo cáo demo trên thiết bị.',
+          : 'Đã lưu cảnh báo trên thiết bị (chưa đồng bộ cloud).',
     );
   }
 
   Future<void> _acceptCase() async {
     final selected = _selectedSession;
     if (selected == null) return;
-    final helperId = widget.firebaseReady
-        ? FirebaseAuth.instance.currentUser!.uid
-        : await DeviceIdentity.getOrCreate();
-    if (widget.firebaseReady) {
-      await AnDoFirebase.database
-          .ref('sos_assignments/${selected.id}/$helperId')
-          .set({
-        'acceptedAt': ServerValue.timestamp,
-        'status': 'heading_to_scene',
-      });
+    if (_mySession?.id == selected.id) {
+      if (mounted) _showMessage(S(context).cannotHelpOwnSos);
+      return;
     }
-    if (mounted) _showMessage('Đã nhận hỗ trợ ca SOS ${selected.id}.');
+    try {
+      final helperId = await _viewerId();
+      await _sosRepository
+          .acceptHelp(sosId: selected.id, helperId: helperId)
+          .timeout(const Duration(seconds: 8));
+      if (!mounted) return;
+      setState(() => _acceptedSosIds.add(selected.id));
+      _watchSelectedThreadMeta(selected);
+      _showMessage('Đã nhận hỗ trợ ca SOS ${selected.id}.');
+    } catch (error, stack) {
+      debugPrint('Accept SOS failed: $error\n$stack');
+      if (mounted) _showMessage('Không thể nhận hỗ trợ lúc này.');
+    }
   }
 
   Future<void> _call112() async {
@@ -558,11 +826,16 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _openSearch() async {
+    final origin = _originOrNull;
+    if (origin == null) {
+      _showMessage('Chưa lấy được vị trí GPS thật. Bật GPS rồi thử lại.');
+      return;
+    }
     final result = await showMapSearchSheet(
       context: context,
       sessions: _sessions,
       hazards: _hazards,
-      origin: _origin,
+      origin: origin,
     );
     if (result == null || !mounted) return;
     switch (result) {
@@ -576,6 +849,11 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _applyMapFocus(MapFocusKind kind) async {
+    final origin = _originOrNull;
+    if (origin == null) {
+      _showMessage('Chưa lấy được vị trí GPS thật. Bật GPS rồi thử lại.');
+      return;
+    }
     await _clearSelection();
     switch (kind) {
       case MapFocusKind.nearestSos:
@@ -584,8 +862,8 @@ class _MapScreenState extends State<MapScreen> {
         var best = double.infinity;
         for (final session in _sessions) {
           final d = Geolocator.distanceBetween(
-            _origin.latitude,
-            _origin.longitude,
+            origin.latitude,
+            origin.longitude,
             session.latitude,
             session.longitude,
           );
@@ -693,40 +971,36 @@ class _MapScreenState extends State<MapScreen> {
         body: Stack(
           children: [
             Positioned.fill(
-              child: MapLibreMap(
-                // demotiles is world-outline only — blank at city zoom.
-                styleString: MapLibreStyles.openfreemapLiberty,
-                initialCameraPosition: const CameraPosition(
-                  target: LatLng(21.0285, 105.8042),
-                  zoom: 12.2,
-                ),
-                myLocationEnabled: true,
-                myLocationTrackingMode: MyLocationTrackingMode.none,
-                compassEnabled: false,
-                onMapCreated: (controller) {
+              child: _StableMapLibre(
+                key: _mapKey,
+                onCreated: (controller) {
                   _mapController = controller;
-                  controller.onSymbolTapped.add((symbol) {
-                    final session = _symbolSessions[symbol.id];
-                    if (session != null) {
-                      unawaited(_selectSession(session));
-                      return;
+                  _markerLayers = MapMarkerLayers(controller);
+                  controller.onFeatureTapped.add((point, latLng, id, layerId, annotation) {
+                    if (_mySession != null) return; // ignore map taps while owning SOS
+                    if (layerId == MapMarkerLayers.sosLayer) {
+                      for (final s in _sessions) {
+                        if (s.id == id) {
+                          unawaited(_selectSession(s));
+                          return;
+                        }
+                      }
+                    } else if (layerId == MapMarkerLayers.hazardLayer) {
+                      for (final h in _hazards) {
+                        if (h.id == id) {
+                          unawaited(_selectHazard(h));
+                          return;
+                        }
+                      }
                     }
-                    final hazard = _symbolHazards[symbol.id];
-                    if (hazard != null) unawaited(_selectHazard(hazard));
-                  });
-                  controller.onCircleTapped.add((circle) {
-                    final session = _circleSessions[circle.id];
-                    if (session != null) {
-                      unawaited(_selectSession(session));
-                      return;
-                    }
-                    final hazard = _circleHazards[circle.id];
-                    if (hazard != null) unawaited(_selectHazard(hazard));
                   });
                 },
-                onStyleLoadedCallback: () {
+                onStyleLoaded: () {
                   _styleReady = true;
-                  unawaited(_renderMapOverlays());
+                  unawaited(() async {
+                    await _markerLayers?.ensureLayers();
+                    _scheduleMapOverlays();
+                  }());
                 },
               ),
             ),
@@ -786,56 +1060,44 @@ class _MapScreenState extends State<MapScreen> {
             ),
             if (_mySession != null)
               SafeArea(
-                child: Container(
-                  margin: const EdgeInsets.fromLTRB(12, 74, 12, 0),
-                  padding: const EdgeInsets.all(13),
-                  decoration: BoxDecoration(
-                    color: AppTheme.danger,
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: const [
-                      BoxShadow(color: Colors.black26, blurRadius: 20),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.sos, color: Colors.white),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          '${strings.sosActive} · ${_mySession!.id}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Gọi 112',
-                        onPressed: _call112,
-                        icon: const Icon(Icons.call, color: Colors.white),
-                      ),
-                      TextButton(
-                        onPressed: _finishSos,
-                        child: Text(
-                          strings.stopSos,
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    ],
-                  ),
+                child: ValueListenableBuilder<List<String>>(
+                  valueListenable: _helperIdsListenable,
+                  builder: (context, helperIds, _) {
+                    return ActiveSosBanner(
+                      sosId: _mySession!.id,
+                      title: strings.sosActive,
+                      safeLabel: strings.stopSos,
+                      callLabel: strings.call112,
+                      chatLabel: strings.openChat,
+                      helperCountListenable: _helperCountListenable,
+                      unreadListenable: _ownerUnreadListenable,
+                      helpersWatchingLabel: strings.helpersWatching,
+                      chatEnabled: helperIds.isNotEmpty,
+                      onCall: _call112,
+                      onChat: () => unawaited(_openOwnerChatPicker()),
+                      onSafe: () => unawaited(_finishSos()),
+                    );
+                  },
                 ),
               ),
-            if (_selectedSession == null && _selectedHazard == null)
+            if (_mySession == null &&
+                _selectedSession == null &&
+                _selectedHazard == null)
               MapActionDock(onSos: _startSos)
-            else if (_selectedSession != null)
+            else if (_mySession == null && _selectedSession != null)
               SosDetailPanel(
                 session: _selectedSession!,
                 routes: _routes,
                 loadingRoutes: _loadingRoutes,
+                isOwnSession: _mySession?.id == _selectedSession!.id,
+                accepted: _acceptedSosIds.contains(_selectedSession!.id),
+                unreadCount: _selectedThreadUnread,
                 onClose: () => unawaited(_clearSelection()),
                 onAccept: () => unawaited(_acceptCase()),
                 onCompass: _openCompass,
                 onRouteSelected: (route) => unawaited(_drawRoute(route)),
+                onMessageVictim: () =>
+                    unawaited(_openVictimChat(_selectedSession!)),
               )
             else if (_selectedHazard != null)
               HazardDetailPanel(
@@ -875,6 +1137,45 @@ class GlassButton extends StatelessWidget {
           child: Icon(icon),
         ),
       ),
+    );
+  }
+}
+
+
+/// Keeps MapLibre platform view stable across parent setState rebuilds.
+class _StableMapLibre extends StatefulWidget {
+  const _StableMapLibre({
+    required this.onCreated,
+    required this.onStyleLoaded,
+    super.key,
+  });
+
+  final void Function(MapLibreMapController controller) onCreated;
+  final VoidCallback onStyleLoaded;
+
+  @override
+  State<_StableMapLibre> createState() => _StableMapLibreState();
+}
+
+class _StableMapLibreState extends State<_StableMapLibre>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return MapLibreMap(
+      styleString: MapLibreStyles.openfreemapLiberty,
+      initialCameraPosition: const CameraPosition(
+        target: LatLng(21.0285, 105.8042),
+        zoom: 12.2,
+      ),
+      myLocationEnabled: false,
+      myLocationTrackingMode: MyLocationTrackingMode.none,
+      compassEnabled: false,
+      onMapCreated: widget.onCreated,
+      onStyleLoadedCallback: widget.onStyleLoaded,
     );
   }
 }

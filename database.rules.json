@@ -11,10 +11,33 @@
     },
     "sos_assignments": {
       "$sosId": {
+        ".read": "auth != null && root.child('active_sos').child($sosId).child('ownerId').val() == auth.uid",
         "$helperId": {
-          ".read": "auth != null",
-          ".write": "auth != null && auth.uid == $helperId"
+          ".read": "auth != null && (auth.uid == $helperId || root.child('active_sos').child($sosId).child('ownerId').val() == auth.uid)",
+          ".write": "auth != null && auth.uid == $helperId",
+          ".validate": "newData.hasChildren(['acceptedAt', 'status'])"
         }
+      }
+    },
+    "sos_chats": {
+      "$sosId": {
+        ".read": "auth != null && root.child('active_sos').child($sosId).child('ownerId').val() == auth.uid",
+        "$helperId": {
+          ".read": "auth != null && (auth.uid == $helperId || root.child('active_sos').child($sosId).child('ownerId').val() == auth.uid)",
+          ".write": "auth != null && (auth.uid == $helperId || root.child('active_sos').child($sosId).child('ownerId').val() == auth.uid)",
+          "messages": {
+            "$msgId": {
+              ".validate": "newData.hasChildren(['senderId', 'type', 'createdAt']) && (newData.child('senderId').val() == auth.uid || data.exists())"
+            }
+          }
+        }
+      }
+    },
+    "user_tokens": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid",
+        ".validate": "newData.hasChildren(['token', 'updatedAt'])"
       }
     }
   }

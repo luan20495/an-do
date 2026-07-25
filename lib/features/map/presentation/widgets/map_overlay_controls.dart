@@ -73,6 +73,10 @@ class SosDetailPanel extends StatelessWidget {
     required this.onAccept,
     required this.onCompass,
     required this.onRouteSelected,
+    this.onMessageVictim,
+    this.accepted = false,
+    this.unreadCount = 0,
+    this.isOwnSession = false,
     super.key,
   });
 
@@ -83,6 +87,10 @@ class SosDetailPanel extends StatelessWidget {
   final VoidCallback onAccept;
   final VoidCallback onCompass;
   final ValueChanged<RescueRoute> onRouteSelected;
+  final VoidCallback? onMessageVictim;
+  final bool accepted;
+  final int unreadCount;
+  final bool isOwnSession;
 
   @override
   Widget build(BuildContext context) {
@@ -164,9 +172,11 @@ class SosDetailPanel extends StatelessWidget {
                       children: [
                         Expanded(
                           child: FilledButton.icon(
-                            onPressed: onAccept,
+                            onPressed: (isOwnSession || accepted) ? null : onAccept,
                             icon: const Icon(Icons.volunteer_activism_outlined),
-                            label: Text(strings.helpThis),
+                            label: Text(
+                              accepted ? strings.helpingThis : strings.helpThis,
+                            ),
                             style: FilledButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
@@ -186,6 +196,29 @@ class SosDetailPanel extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (accepted && onMessageVictim != null) ...[
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: onMessageVictim,
+                          icon: Badge(
+                            isLabelVisible: unreadCount > 0,
+                            label: Text('$unreadCount'),
+                            child: const Icon(Icons.chat_bubble_outline_rounded),
+                          ),
+                          label: Text(strings.messageVictim),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            foregroundColor: AppTheme.brand,
+                            side: const BorderSide(color: AppTheme.brand),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 14),
                     Text(
                       strings.routes,

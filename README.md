@@ -27,15 +27,19 @@ Repo này chuyển prototype HTML thành ứng dụng Flutter native. HTML chỉ
 - Geolocator + flutter_foreground_task
 - OSRM public demo endpoint qua interface có thể đổi sang server riêng
 
-## Chạy nhanh
+## Chạy nhanh (dữ liệu thật — Firebase)
 
 ```bash
 ./tool/repair_platform_scaffold.sh  # chạy một lần nếu ZIP chưa có gradle-wrapper.jar
 flutter pub get
-flutter run --flavor dev --dart-define=FIREBASE_ENABLED=false
+flutter run --flavor production --dart-define=FIREBASE_ENABLED=true
+# hoặc flavor dev cùng cloud:
+flutter run --flavor dev --dart-define=FIREBASE_ENABLED=true
 ```
 
-Chế độ trên dùng dữ liệu demo local và bản đồ online, phù hợp để kiểm tra UI mà chưa cần Firebase.
+App **không** còn seed SOS/hazard giả. Bản đồ chỉ hiện phiên SOS / báo cáo thật từ thiết bị + Firebase.
+
+Khi GPS tắt, SOS/báo cáo sẽ yêu cầu bật GPS — không dùng tọa độ demo.
 
 ## Firebase (đã cấu hình)
 

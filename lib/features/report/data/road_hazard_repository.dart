@@ -1,6 +1,6 @@
 import 'dart:async';
 
-/// Road hazard shown on the map (demo or synced later).
+/// Road hazard shown on the map (user-reported or synced from cloud).
 class RoadHazard {
   const RoadHazard({
     required this.id,
@@ -24,28 +24,8 @@ abstract interface class RoadHazardRepository {
   Future<void> add(RoadHazard hazard);
 }
 
-class DemoRoadHazardRepository implements RoadHazardRepository {
-  DemoRoadHazardRepository() {
-    _items.addAll(const [
-      RoadHazard(
-        id: 'warn-1',
-        latitude: 21.0390,
-        longitude: 105.8260,
-        type: 'flood',
-        label: 'Ngập sâu 40–50 cm',
-        severity: 'high',
-      ),
-      RoadHazard(
-        id: 'warn-2',
-        latitude: 21.0450,
-        longitude: 105.8208,
-        type: 'fallen_tree',
-        label: 'Cây đổ chắn nửa đường',
-        severity: 'medium',
-      ),
-    ]);
-  }
-
+/// Starts empty — only hazards the user actually reports appear.
+class LocalRoadHazardRepository implements RoadHazardRepository {
   final _controller = StreamController<List<RoadHazard>>.broadcast();
   final List<RoadHazard> _items = [];
 
@@ -70,3 +50,5 @@ class DemoRoadHazardRepository implements RoadHazardRepository {
     _emit();
   }
 }
+
+typedef DemoRoadHazardRepository = LocalRoadHazardRepository;

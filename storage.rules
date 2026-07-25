@@ -8,5 +8,13 @@ service firebase.storage {
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
+
+    // Thread participants are enforced in RTDB chat rules; Storage requires auth + size/type.
+    match /sos_chat_audio/{sosId}/{helperId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('audio/.*');
+    }
   }
 }

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:an_do/core/firebase/fcm_bootstrap.dart';
 import 'package:an_do/core/i18n/app_language_controller.dart';
 import 'package:an_do/core/theme/app_theme.dart';
 import 'package:an_do/features/map/presentation/map_screen.dart';
@@ -16,7 +19,6 @@ class AnDoApp extends StatefulWidget {
 
 class _AnDoAppState extends State<AnDoApp> {
   final AppLanguageController _language = AppLanguageController();
-  bool _ready = false;
 
   static const _localizationsDelegates = <LocalizationsDelegate<dynamic>>[
     GlobalMaterialLocalizations.delegate,
@@ -28,30 +30,26 @@ class _AnDoAppState extends State<AnDoApp> {
   @override
   void initState() {
     super.initState();
-    _load();
+    // Never block first frame on prefs — hydrate in background.
+    unawaited(_hydrateLanguage());
   }
 
-  Future<void> _load() async {
-    await _language.load();
-    if (mounted) setState(() => _ready = true);
+  Future<void> _hydrateLanguage() async {
+    try {
+      await _language.load().timeout(const Duration(seconds: 3));
+      if (mounted) setState(() {});
+    } catch (error, stack) {
+      debugPrint('Language prefs load failed: $error\n$stack');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_ready) {
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        localizationsDelegates: _localizationsDelegates,
-        supportedLocales: AppLanguageController.supportedLocales,
-        home: const Scaffold(body: Center(child: CircularProgressIndicator())),
-      );
-    }
-
     return AnimatedBuilder(
       animation: _language,
       builder: (context, _) => MaterialApp(
         debugShowCheckedModeBanner: false,
+        navigatorKey: anDoNavigatorKey,
         title: 'An Đồ',
         locale: _language.locale,
         supportedLocales: AppLanguageController.supportedLocales,

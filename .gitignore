@@ -19,3 +19,10 @@ firebase_options.local.dart
 android/upload-keystore.*
 android/*.BACKUP.txt
 *.aab
+*.hprof
+functions/node_modules/
+store/device-test/
+store/play-demo/debug_*.png
+store/play-demo/demo_*.png
+store/play-demo/frames/
+store/play-demo/frames2/

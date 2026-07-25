@@ -62,6 +62,49 @@ class S {
   String get stopSos => vi ? 'Tôi đã an toàn' : 'I am safe';
   String get call112 => vi ? 'Gọi 112' : 'Call 112';
   String get helpThis => vi ? 'Hỗ trợ ca này' : 'Help this case';
+  String helpersWatching(int n) => n <= 0
+      ? (vi
+          ? 'Chưa có ai theo dõi phiên SOS'
+          : 'No one is watching your SOS yet')
+      : (vi
+          ? (n == 1
+              ? '1 người đang hỗ trợ bạn'
+              : '$n người đang hỗ trợ bạn')
+          : (n == 1
+              ? '1 person is helping you'
+              : '$n people are helping you'));
+  String helperJoined(int n) => vi
+      ? (n == 1
+          ? 'Có 1 người vừa bắt đầu hỗ trợ bạn.'
+          : 'Có $n người đang để ý đến bạn.')
+      : (n == 1
+          ? 'Someone just started helping you.'
+          : '$n people are now watching your SOS.');
+  String get cannotHelpOwnSos =>
+      vi ? 'Đây là phiên SOS của bạn.' : 'This is your own SOS session.';
+  String get chatHelpersTitle =>
+      vi ? 'Người đang hỗ trợ bạn' : 'People helping you';
+  String get chatHelpersSubtitle => vi
+      ? 'Chọn một người để nhắn tin hoặc gửi audio.'
+      : 'Pick someone to message or send audio.';
+  String get helperLabel => vi ? 'Người hỗ trợ' : 'Helper';
+  String get chatEmptyThread =>
+      vi ? 'Chưa có tin nhắn' : 'No messages yet';
+  String get chatEmptyHint => vi
+      ? 'Giữ mic để nói nhanh khi đang di chuyển. Hoặc gõ tin nhắn bên dưới.'
+      : 'Hold the mic to talk while moving. Or type a message below.';
+  String get chatHint => vi ? 'Nhắn tin…' : 'Message…';
+  String get chatRecording =>
+      vi ? 'Đang ghi… thả để gửi · kéo lên để hủy' : 'Recording… release to send · swipe up to cancel';
+  String get chatReleaseToCancel =>
+      vi ? 'Thả để hủy' : 'Release to cancel';
+  String get micPermissionDenied => vi
+      ? 'Cần quyền micro để gửi tin audio.'
+      : 'Microphone permission is required for audio messages.';
+  String get messageVictim => vi ? 'Nhắn nạn nhân' : 'Message victim';
+  String get openChat => vi ? 'Nhắn hỗ trợ' : 'Message helpers';
+  String get victimLabel => vi ? 'Người cần cứu hộ' : 'Person in need';
+  String get helpingThis => vi ? 'Đang hỗ trợ ca này' : 'Helping this case';
   String get optional => vi ? 'Không bắt buộc' : 'Optional';
   String get sendSos => vi ? 'Phát SOS ngay' : 'Send SOS now';
   String get name => vi ? 'Tên' : 'Name';
