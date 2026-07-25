@@ -1,7 +1,7 @@
 name: an_do
 publish_to: none
 description: An Đồ - bản đồ SOS cộng đồng, Android-first.
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: '>=3.7.0 <4.0.0'

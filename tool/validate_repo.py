@@ -7,6 +7,6 @@ text='\n'.join(p.read_text(errors='ignore') for p in root.rglob('*') if p.is_fil
 runtime='\n'.join(p.read_text(errors='ignore') for p in (root/'lib').rglob('*.dart'))
 assert 'webview_flutter' not in runtime and 'WebView(' not in runtime
 assert 'com.hoangluan.safetymap' in text
-assert 'ACCESS_BACKGROUND_LOCATION' in text
+assert 'ACCESS_BACKGROUND_LOCATION' not in (root/'android/app/src/main/AndroidManifest.xml').read_text()
 assert 'FOREGROUND_SERVICE_LOCATION' in text
 print('REPOSITORY_STRUCTURE_OK')
